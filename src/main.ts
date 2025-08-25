@@ -6,7 +6,8 @@ import {
   HttpApiSchema,
   HttpApiSwagger,
   HttpMiddleware,
-  HttpServer
+  HttpServer,
+  HttpServerResponse
 } from "@effect/platform"
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun"
 import { Effect, Layer, Schema } from "effect"
@@ -28,7 +29,14 @@ const searchGroupLive = HttpApiBuilder.group(api, "search", (handlers) =>
 )
 
 const vaultFilesGroupLive = HttpApiBuilder.group(api, "vaultFiles", (handlers) =>
-  handlers.handle("getFile", ({ params }) => Effect.succeed(`File content for: ${params.filename}`))
+  handlers.handle("getFile", ({ path: { filename } }) => 
+    Effect.succeed(
+      HttpServerResponse.text(
+        `# Hello World\n\nThis is markdown content for file: ${filename}`,
+        { contentType: "text/markdown" }
+      )
+    )
+  )
 )
 
 const MyApiLive = HttpApiBuilder.api(api).pipe(
