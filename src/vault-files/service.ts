@@ -8,16 +8,16 @@ export class VaultFilesService extends Context.Tag("VaultFilesService")<
   {
     readonly getFile: (filename: string) => Effect.Effect<HttpServerResponse.HttpServerResponse>
   }
->() {}
+>() { }
 
 export const VaultFilesServiceLive = Layer.effect(
   VaultFilesService,
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const config = yield* VaultConfig
 
     return {
       getFile: (filename: string) =>
-        Effect.gen(function*() {
+        Effect.gen(function* () {
           // Ensure filename ends with .md
           const normalizedFilename = filename.endsWith(".md") ? filename : `${filename}.md`
           const filePath = path.join(config.vaultPath, normalizedFilename)
