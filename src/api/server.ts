@@ -1,47 +1,22 @@
 import {
   HttpApi,
   HttpApiBuilder,
-  HttpApiEndpoint,
-  HttpApiGroup,
-  HttpApiSchema,
   HttpApiSwagger,
   HttpMiddleware,
-  HttpServer,
-  HttpServerResponse
+  HttpServer
 } from "@effect/platform"
 import { BunHttpServer } from "@effect/platform-bun"
-import { Effect, Layer, Schema } from "effect"
+import { Layer } from "effect"
+import { SearchLive, searchGroup } from "../search/api.js"
+import { VaultFilesLive, vaultFilesGroup } from "../vault-files/api.js"
 
-const searchGroup = HttpApiGroup.make("Search").add(
-  HttpApiEndpoint.get("simple")`/search/simple`.addSuccess(Schema.String)
-)
+export const api = HttpApi.make("Obsidian API")
+  .add(searchGroup)
+  .add(vaultFilesGroup)
 
-const filenameParam = HttpApiSchema.param("filename", Schema.String)
-
-const vaultFilesGroup = HttpApiGroup.make("Vault Files").add(
-  HttpApiEndpoint.get("getFile")`/vault/${filenameParam}`.addSuccess(Schema.String)
-)
-
-const api = HttpApi.make("Obsidian API").add(searchGroup).add(vaultFilesGroup)
-
-const searchGroupLive = HttpApiBuilder.group(api, "Search", (handlers) =>
-  handlers.handle("simple", () => Effect.succeed("Hello World"))
-)
-
-const vaultFilesGroupLive = HttpApiBuilder.group(api, "Vault Files", (handlers) =>
-  handlers.handle("getFile", ({ path: { filename } }) =>
-    Effect.succeed(
-      HttpServerResponse.text(
-        `# Hello World\n\nThis is markdown content for file: ${filename}`,
-        { contentType: "text/markdown" }
-      )
-    )
-  )
-)
-
-const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
-  Layer.provide(searchGroupLive),
-  Layer.provide(vaultFilesGroupLive)
+export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
+  Layer.provide(SearchLive),
+  Layer.provide(VaultFilesLive)
 )
 
 const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
