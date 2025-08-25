@@ -2,7 +2,7 @@ import { HttpApiError } from "@effect/platform"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { VaultConfig } from "../src/config/vault.js"
-import { VaultFilesService, VaultFilesServiceLive } from "../src/vault-files/service.js"
+import { VaultFilesService } from "../src/vault-files/service.js"
 
 describe("VaultFilesService", () => {
   const testVaultConfig = Layer.succeed(VaultConfig, {
@@ -16,7 +16,7 @@ describe("VaultFilesService", () => {
       expect(result).toBeInstanceOf(HttpApiError.NotFound)
     }).pipe(
       Effect.provide(
-        Layer.provide(VaultFilesServiceLive, testVaultConfig)
+        Layer.provide(VaultFilesService.Live, testVaultConfig)
       )
     ))
 
@@ -29,7 +29,7 @@ describe("VaultFilesService", () => {
       expect(result).toBeInstanceOf(HttpApiError.NotFound)
     }).pipe(
       Effect.provide(
-        Layer.provide(VaultFilesServiceLive, testVaultConfig)
+        Layer.provide(VaultFilesService.Live, testVaultConfig)
       )
     ))
 
@@ -40,7 +40,7 @@ describe("VaultFilesService", () => {
       expect(result).toBeInstanceOf(HttpApiError.BadRequest)
     }).pipe(
       Effect.provide(
-        Layer.provide(VaultFilesServiceLive, testVaultConfig)
+        Layer.provide(VaultFilesService.Live, testVaultConfig)
       )
     ))
 })

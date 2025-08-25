@@ -1,7 +1,7 @@
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform"
 import { Effect, Layer, Schema } from "effect"
 import { SearchResults } from "./schema.js"
-import { SearchService, SearchServiceLive } from "./service.js"
+import { SearchService } from "./service.js"
 
 const queryParam = HttpApiSchema.param("query", Schema.String)
 
@@ -21,4 +21,4 @@ export const searchHandlers = HttpApiBuilder.group(
     )
 )
 
-export const SearchLive = Layer.provide(searchHandlers, SearchServiceLive)
+export const SearchLive = Layer.provide(searchHandlers, SearchService.Live)

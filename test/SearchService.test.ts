@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { VaultConfig } from "../src/config/vault.js"
-import { SearchService, SearchServiceLive } from "../src/search/service.js"
+import { SearchService } from "../src/search/service.js"
 
 describe("SearchService", () => {
   const createTestVault = Effect.gen(function*() {
@@ -51,7 +51,7 @@ describe("SearchService", () => {
         yield* cleanupTestVault(vaultPath)
       }
     }).pipe(
-      Effect.provide(SearchServiceLive),
+      Effect.provide(SearchService.Live),
       Effect.provide(Layer.succeed(VaultConfig, { vaultPath: "/tmp/empty-vault" }))
     ))
 
@@ -69,7 +69,7 @@ describe("SearchService", () => {
         expect(result[0]).toHaveProperty("context")
         expect(result[0].context.toLowerCase()).toContain("test")
       }).pipe(
-        Effect.provide(SearchServiceLive),
+        Effect.provide(SearchService.Live),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
       )
 
@@ -89,7 +89,7 @@ describe("SearchService", () => {
         const result = yield* service.simpleSearch("nonexistentquery")
         expect(result).toEqual([])
       }).pipe(
-        Effect.provide(SearchServiceLive),
+        Effect.provide(SearchService.Live),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
       )
 
@@ -112,7 +112,7 @@ describe("SearchService", () => {
         expect(result[0].filePath).toContain("subfolder")
         expect(result[0].context.toLowerCase()).toContain("nested")
       }).pipe(
-        Effect.provide(SearchServiceLive),
+        Effect.provide(SearchService.Live),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
       )
 

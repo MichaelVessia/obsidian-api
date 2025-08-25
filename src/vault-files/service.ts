@@ -5,7 +5,7 @@ import { VaultConfig } from "../config/vault.js"
 
 const make = {
   getFile: (filename: string) =>
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const config = yield* VaultConfig
 
       // Validate filename
@@ -32,11 +32,6 @@ const make = {
 export class VaultFilesService extends Context.Tag("VaultFilesService")<
   VaultFilesService,
   typeof make
->() {}
-
-export const VaultFilesServiceLive = Layer.effect(
-  VaultFilesService,
-  Effect.gen(function*() {
-    return make
-  })
-)
+>() {
+  static readonly Live = Layer.succeed(VaultFilesService, make)
+}
