@@ -1,14 +1,14 @@
 import { HttpServerResponse } from "@effect/platform"
 import { Effect, Context, Layer } from "effect"
 
-export class VaultService extends Context.Tag("VaultService")<
-  VaultService,
+export class VaultFilesService extends Context.Tag("VaultFilesService")<
+  VaultFilesService,
   {
     readonly getFile: (filename: string) => Effect.Effect<HttpServerResponse.HttpServerResponse>
   }
->() {}
+>() { }
 
-export const VaultServiceLive = Layer.succeed(VaultService, {
+export const VaultFilesServiceLive = Layer.succeed(VaultFilesService, {
   getFile: (filename: string) =>
     Effect.succeed(
       HttpServerResponse.text(

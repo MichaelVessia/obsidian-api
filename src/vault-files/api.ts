@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, HttpApi, HttpApiBuilder } from "@effect/platform"
 import { Schema, Effect, Layer } from "effect"
-import { VaultService, VaultServiceLive } from "./service.js"
+import { VaultFilesService, VaultFilesServiceLive } from "./service.js"
 
 const filenameParam = HttpApiSchema.param("filename", Schema.String)
 
@@ -10,10 +10,10 @@ export const vaultFilesGroup = HttpApiGroup.make("Vault Files").add(
 
 const api = HttpApi.make("Vault").add(vaultFilesGroup)
 
-export const vaultHandlers = HttpApiBuilder.group(api, "Vault Files", (handlers) =>
+export const vaultFilesHandlers = HttpApiBuilder.group(api, "Vault Files", (handlers) =>
   handlers.handle("getFile", ({ path: { filename } }) =>
-    Effect.flatMap(VaultService, (service) => service.getFile(filename))
+    Effect.flatMap(VaultFilesService, (service) => service.getFile(filename))
   )
 )
 
-export const VaultFilesLive = Layer.provide(vaultHandlers, VaultServiceLive)
+export const VaultFilesLive = Layer.provide(vaultFilesHandlers, VaultFilesServiceLive)
