@@ -1,4 +1,3 @@
-import { HttpServerResponse } from "@effect/platform"
 import { Context, Effect, Layer } from "effect"
 import * as path from "node:path"
 import { VaultConfig } from "../config/vault.js"
@@ -6,7 +5,7 @@ import { VaultConfig } from "../config/vault.js"
 export class VaultFilesService extends Context.Tag("VaultFilesService")<
   VaultFilesService,
   {
-    readonly getFile: (filename: string) => Effect.Effect<HttpServerResponse.HttpServerResponse>
+    readonly getFile: (filename: string) => Effect.Effect<string>
   }
 >() { }
 
@@ -26,17 +25,11 @@ export const VaultFilesServiceLive = Layer.effect(
           const exists = yield* Effect.promise(() => file.exists())
 
           if (!exists) {
-            return HttpServerResponse.text(`File not found: ${normalizedFilename}`, {
-              status: 404,
-              contentType: "text/plain"
-            })
+            return `File not found: ${normalizedFilename}`
           }
 
           const content = yield* Effect.promise(() => file.text())
-
-          return HttpServerResponse.text(content, {
-            contentType: "text/markdown"
-          })
+          return content
         })
     }
   })

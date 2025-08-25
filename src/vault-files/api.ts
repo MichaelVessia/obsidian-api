@@ -5,7 +5,15 @@ import { VaultFilesService, VaultFilesServiceLive } from "./service.js"
 const filenameParam = HttpApiSchema.param("filename", Schema.String)
 
 export const vaultFilesGroup = HttpApiGroup.make("Vault Files").add(
-  HttpApiEndpoint.get("getFile")`/vault-files/${filenameParam}`.addSuccess(Schema.String)
+  HttpApiEndpoint.get("getFile")`/vault-files/${filenameParam}`
+    .addSuccess(
+      Schema.String.pipe(
+        HttpApiSchema.withEncoding({
+          kind: "Text",
+          contentType: "text/markdown"
+        })
+      )
+    )
 )
 
 const api = HttpApi.make("Vault").add(vaultFilesGroup)
