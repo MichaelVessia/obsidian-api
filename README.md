@@ -1,31 +1,31 @@
-# Effect Package Template
+# Obsidian API
 
-This template provides a solid foundation for building scalable and maintainable TypeScript package with Effect. 
+Local API for interacting with an Obsidian vault.
 
-## Running Code
+## Development
 
-This template leverages [tsx](https://tsx.is) to allow execution of TypeScript files via NodeJS as if they were written in plain JavaScript.
-
-To execute a file with `tsx`:
+Run the development server:
 
 ```sh
-pnpm tsx ./path/to/the/file.ts
+bun run dev
 ```
 
 ## Operations
 
 **Building**
 
-To build the package:
-
 ```sh
-pnpm build
+bun run build
 ```
 
 **Testing**
 
-To test the package:
+```sh
+bun run test
+```
+
+**Linting**
 
 ```sh
-pnpm test
+bun run lint
 ```
