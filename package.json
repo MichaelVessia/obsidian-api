@@ -2,7 +2,7 @@
   "name": "@template/basic",
   "version": "0.0.0",
   "type": "module",
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "bun@1.2.13",
   "license": "MIT",
   "description": "A basic Effect package",
   "repository": {
@@ -16,17 +16,17 @@
   "scripts": {
     "dev": "bun run src/main.ts",
     "codegen": "build-utils prepare-v2",
-    "build": "pnpm build-esm && pnpm build-annotate && pnpm build-cjs && build-utils pack-v2",
+    "build": "bun run build-esm && bun run build-annotate && bun run build-cjs && build-utils pack-v2",
     "build-esm": "tsc -b tsconfig.build.json",
     "build-cjs": "babel build/esm --plugins @babel/transform-export-namespace-from --plugins @babel/transform-modules-commonjs --out-dir build/cjs --source-maps",
     "build-annotate": "babel build/esm --plugins annotate-pure-calls --out-dir build/esm --source-maps",
     "check": "tsc -b tsconfig.json",
     "lint": "eslint \"**/{src,test,examples,scripts,dtslint}/**/*.{ts,mjs}\"",
-    "lint-fix": "pnpm lint --fix",
+    "lint-fix": "bun run lint --fix",
     "test": "vitest",
     "coverage": "vitest --coverage",
-    "changeset-version": "changeset version && node scripts/version.mjs",
-    "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish"
+    "changeset-version": "changeset version && bun scripts/version.mjs",
+    "changeset-publish": "bun run build && TEST_DIST= bun run test && changeset publish"
   },
   "dependencies": {
     "@effect/platform": "^0.90.6",
@@ -74,9 +74,7 @@
       ]
     }
   },
-  "pnpm": {
-    "patchedDependencies": {
-      "@changesets/get-github-info@0.6.0": "patches/@changesets__get-github-info@0.6.0.patch"
-    }
+  "bun": {
+    "trustedDependencies": ["@changesets/get-github-info"]
   }
 }
