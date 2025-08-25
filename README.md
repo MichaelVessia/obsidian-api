@@ -2,6 +2,12 @@
 
 Local API for interacting with an Obsidian vault.
 
+> **Note**: This is a learning exercise project. For production use, consider using the more mature [obsidian-local-rest-api](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin instead.
+
+## Credits
+
+Inspired by [obsidian-local-rest-api](https://github.com/coddingtonbear/obsidian-local-rest-api) by Adam Coddington.
+
 ## Configuration
 
 The API requires a `VAULT_PATH` environment variable pointing to your Obsidian vault directory.
