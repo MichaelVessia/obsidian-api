@@ -1,4 +1,4 @@
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform"
+import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema } from "@effect/platform"
 import { Effect, Layer, Schema } from "effect"
 import { VaultFilesService, VaultFilesServiceLive } from "./service.js"
 
@@ -14,6 +14,8 @@ export const vaultFilesGroup = HttpApiGroup.make("Vault Files").add(
         })
       )
     )
+    .addError(HttpApiError.NotFound)
+    .addError(HttpApiError.BadRequest)
 )
 
 const api = HttpApi.make("Vault").add(vaultFilesGroup)

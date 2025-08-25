@@ -1,3 +1,4 @@
+import { HttpApiError } from "@effect/platform"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { VaultConfig } from "../src/config/vault.js"
@@ -8,11 +9,11 @@ describe("VaultFilesService", () => {
     vaultPath: "/tmp/test-vault"
   })
 
-  it("should return 404 response for non-existent file", () =>
+  it("should return NotFound error for non-existent file", () =>
     Effect.gen(function*() {
       const service = yield* VaultFilesService
-      const response = yield* service.getFile("non-existent-file")
-      expect(response.status).toBe(404)
+      const result = yield* Effect.flip(service.getFile("non-existent-file"))
+      expect(result).toBeInstanceOf(HttpApiError.NotFound)
     }).pipe(
       Effect.provide(
         Layer.provide(VaultFilesServiceLive, testVaultConfig)
@@ -22,10 +23,21 @@ describe("VaultFilesService", () => {
   it("should normalize filename by adding .md extension", () =>
     Effect.gen(function*() {
       const service = yield* VaultFilesService
-      const response = yield* service.getFile("test")
+      const result = yield* Effect.flip(service.getFile("test"))
       // This should attempt to read "test.md" even when we pass "test"
-      // For non-existent file, should return 404 status indicating it tried to read test.md
-      expect(response.status).toBe(404)
+      // For non-existent file, should return NotFound error indicating it tried to read test.md
+      expect(result).toBeInstanceOf(HttpApiError.NotFound)
+    }).pipe(
+      Effect.provide(
+        Layer.provide(VaultFilesServiceLive, testVaultConfig)
+      )
+    ))
+
+  it("should return BadRequest error for empty filename", () =>
+    Effect.gen(function*() {
+      const service = yield* VaultFilesService
+      const result = yield* Effect.flip(service.getFile(""))
+      expect(result).toBeInstanceOf(HttpApiError.BadRequest)
     }).pipe(
       Effect.provide(
         Layer.provide(VaultFilesServiceLive, testVaultConfig)
