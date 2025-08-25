@@ -1,13 +1,13 @@
 {
-  "name": "@template/basic",
+  "name": "obsidian-api",
   "version": "0.0.0",
   "type": "module",
   "packageManager": "bun@1.2.13",
   "license": "MIT",
-  "description": "A basic Effect package",
+  "description": "Local API for interacting with an Obsidian vault",
   "repository": {
     "type": "git",
-    "url": "<PLACEHOLDER>"
+    "url": "https://github.com/michaelvessia/obsidian-api"
   },
   "publishConfig": {
     "access": "public",
