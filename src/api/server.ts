@@ -1,14 +1,9 @@
-import {
-  HttpApi,
-  HttpApiBuilder,
-  HttpApiSwagger,
-  HttpMiddleware,
-  HttpServer
-} from "@effect/platform"
+import { HttpApi, HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from "@effect/platform"
 import { BunHttpServer } from "@effect/platform-bun"
 import { Layer } from "effect"
-import { SearchLive, searchGroup } from "../search/api.js"
-import { VaultFilesLive, vaultFilesGroup } from "../vault-files/api.js"
+import { VaultConfigLive } from "../config/vault.js"
+import { searchGroup, SearchLive } from "../search/api.js"
+import { vaultFilesGroup, VaultFilesLive } from "../vault-files/api.js"
 
 export const api = HttpApi.make("Obsidian API")
   .add(searchGroup)
@@ -16,7 +11,8 @@ export const api = HttpApi.make("Obsidian API")
 
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
   Layer.provide(SearchLive),
-  Layer.provide(VaultFilesLive)
+  Layer.provide(VaultFilesLive),
+  Layer.provide(VaultConfigLive)
 )
 
 const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
@@ -32,6 +28,6 @@ const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
 
 const port = 3000
 
-const Server = BunHttpServer.layer({ port });
+const Server = BunHttpServer.layer({ port })
 
-export const ApiServer = Layer.provide(HttpLive, Server);
+export const ApiServer = Layer.provide(HttpLive, Server)

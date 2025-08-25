@@ -1,4 +1,5 @@
-import { Effect, Context, Layer } from "effect"
+import { Context, Effect, Layer } from "effect"
+import { VaultConfig } from "../config/vault.js"
 
 export class SearchService extends Context.Tag("SearchService")<
   SearchService,
@@ -7,6 +8,13 @@ export class SearchService extends Context.Tag("SearchService")<
   }
 >() {}
 
-export const SearchServiceLive = Layer.succeed(SearchService, {
-  simpleSearch: () => Effect.succeed("Hello World")
-})
+export const SearchServiceLive = Layer.effect(
+  SearchService,
+  Effect.gen(function*() {
+    const config = yield* VaultConfig
+
+    return {
+      simpleSearch: () => Effect.succeed(`Vault path configured: ${config.vaultPath}`)
+    }
+  })
+)
