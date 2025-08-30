@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from "effect"
+import { Effect } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { VaultConfig } from "../config/vault.js"
@@ -54,32 +54,29 @@ const walkDirectory = (dirPath: string): Effect.Effect<Array<string>> =>
     return files
   })
 
-const make = {
-  simpleSearch: (query: string) =>
-    Effect.gen(function* () {
-      if (!query || query.trim() === "") {
-        return []
-      }
+export class SearchService extends Effect.Service<SearchService>()("SearchService", {
+  effect: Effect.gen(function* () {
+    return {
+      simpleSearch: (query: string) =>
+        Effect.gen(function* () {
+          if (!query || query.trim() === "") {
+            return []
+          }
 
-      const config = yield* VaultConfig
-      const files = yield* walkDirectory(config.vaultPath)
-      const allResults: Array<SearchResult> = []
+          const config = yield* VaultConfig
+          const files = yield* walkDirectory(config.vaultPath)
+          const allResults: Array<SearchResult> = []
 
-      for (const filePath of files) {
-        const relativePath = path.relative(config.vaultPath, filePath)
-        const fileResults = yield* searchInFile(filePath, query, relativePath)
-        for (const result of fileResults) {
-          allResults.push(result)
-        }
-      }
+          for (const filePath of files) {
+            const relativePath = path.relative(config.vaultPath, filePath)
+            const fileResults = yield* searchInFile(filePath, query, relativePath)
+            for (const result of fileResults) {
+              allResults.push(result)
+            }
+          }
 
-      return allResults
-    })
-}
-
-export class SearchService extends Context.Tag("SearchService")<
-  SearchService,
-  typeof make
->() {
-  static readonly Live = Layer.succeed(SearchService, make)
-}
+          return allResults
+        })
+    }
+  })
+}) {}
