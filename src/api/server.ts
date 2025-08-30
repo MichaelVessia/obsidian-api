@@ -35,7 +35,7 @@ export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
   Layer.provide(searchHandlers),
   Layer.provide(vaultFilesHandlers),
   Layer.provide(SearchService.Live),
-  Layer.provide(VaultFilesService.Live),
+  Layer.provide(VaultFilesService.Default),
   Layer.provide(VaultConfigLive)
 )
 
