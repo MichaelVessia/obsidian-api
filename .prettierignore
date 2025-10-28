@@ -1,0 +1,9 @@
+node_modules
+build
+dist
+coverage
+.changeset
+bun.lock
+*.lock
+*.lockb
+pnpm-lock.yaml

@@ -15,6 +15,7 @@ The API requires a `VAULT_PATH` environment variable pointing to your Obsidian v
 ### Setting VAULT_PATH
 
 **Option 1: Environment variable**
+
 ```sh
 export VAULT_PATH="/path/to/your/vault"
 bun run dev
@@ -22,11 +23,13 @@ bun run dev
 
 **Option 2: .env file**
 Create a `.env` file in the project root:
+
 ```
 VAULT_PATH=/path/to/your/vault
 ```
 
 **Option 3: Inline with command**
+
 ```sh
 VAULT_PATH="/path/to/your/vault" bun run dev
 ```
@@ -39,7 +42,7 @@ The vault path supports tilde (`~`) expansion for home directory:
 # Absolute path
 VAULT_PATH="/Users/username/Documents/MyVault"
 
-# Relative to home directory  
+# Relative to home directory
 VAULT_PATH="~/Documents/MyVault"
 
 # Windows
