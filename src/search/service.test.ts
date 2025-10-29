@@ -7,7 +7,7 @@ import { VaultConfig } from "../config/vault.js";
 import { SearchService } from "./service.js";
 
 describe("SearchService", () => {
-  const createTestVault = Effect.gen(function* () {
+  const createSearchTestVault = Effect.gen(function* () {
     const tempDir = yield* Effect.promise(() =>
       fs.promises.mkdtemp(path.join(os.tmpdir(), "vault-test-")),
     );
@@ -38,34 +38,35 @@ describe("SearchService", () => {
     return tempDir;
   });
 
-  const cleanupTestVault = (vaultPath: string) =>
+  const cleanupSearchTestVault = (vaultPath: string) =>
     Effect.promise(() =>
       fs.promises.rm(vaultPath, { recursive: true, force: true }),
     );
 
-  it("should return empty array for empty query", () =>
-    Effect.gen(function* () {
-      const vaultPath = yield* createTestVault;
+  const withSearchTestVault = <A, E, R>(
+    use: (vaultPath: string) => Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E, R> =>
+    Effect.acquireUseRelease(
+      createSearchTestVault,
+      use,
+      cleanupSearchTestVault,
+    );
 
-      try {
+  it("should return empty array for empty query", () =>
+    withSearchTestVault((vaultPath) =>
+      Effect.gen(function* () {
         const service = yield* SearchService;
         const result = yield* service.simpleSearch("");
         expect(result).toEqual([]);
-      } finally {
-        yield* cleanupTestVault(vaultPath);
-      }
-    }).pipe(
-      Effect.provide(SearchService.Default),
-      Effect.provide(
-        Layer.succeed(VaultConfig, { vaultPath: "/tmp/empty-vault" }),
+      }).pipe(
+        Effect.provide(SearchService.Default),
+        Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
 
   it("should find matches and return results with context", () =>
-    Effect.gen(function* () {
-      const vaultPath = yield* createTestVault;
-
-      const testEffect = Effect.gen(function* () {
+    withSearchTestVault((vaultPath) =>
+      Effect.gen(function* () {
         const service = yield* SearchService;
         const result = yield* service.simpleSearch("test");
 
@@ -77,40 +78,24 @@ describe("SearchService", () => {
       }).pipe(
         Effect.provide(SearchService.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
-      );
-
-      try {
-        yield* testEffect;
-      } finally {
-        yield* cleanupTestVault(vaultPath);
-      }
-    }));
+      ),
+    ));
 
   it("should return no results for non-existent query", () =>
-    Effect.gen(function* () {
-      const vaultPath = yield* createTestVault;
-
-      const testEffect = Effect.gen(function* () {
+    withSearchTestVault((vaultPath) =>
+      Effect.gen(function* () {
         const service = yield* SearchService;
         const result = yield* service.simpleSearch("nonexistentquery");
         expect(result).toEqual([]);
       }).pipe(
         Effect.provide(SearchService.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
-      );
-
-      try {
-        yield* testEffect;
-      } finally {
-        yield* cleanupTestVault(vaultPath);
-      }
-    }));
+      ),
+    ));
 
   it("should search recursively in subdirectories", () =>
-    Effect.gen(function* () {
-      const vaultPath = yield* createTestVault;
-
-      const testEffect = Effect.gen(function* () {
+    withSearchTestVault((vaultPath) =>
+      Effect.gen(function* () {
         const service = yield* SearchService;
         const result = yield* service.simpleSearch("nested");
 
@@ -120,12 +105,6 @@ describe("SearchService", () => {
       }).pipe(
         Effect.provide(SearchService.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
-      );
-
-      try {
-        yield* testEffect;
-      } finally {
-        yield* cleanupTestVault(vaultPath);
-      }
-    }));
+      ),
+    ));
 });
