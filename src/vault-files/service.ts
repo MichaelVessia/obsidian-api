@@ -1,12 +1,16 @@
 import { HttpApiError } from "@effect/platform";
+import { FileSystem, Path } from "@effect/platform";
+import { BunContext } from "@effect/platform-bun";
 import { Effect } from "effect";
-import * as path from "node:path";
 import { VaultConfig } from "../config/vault.js";
 
 export class VaultFilesService extends Effect.Service<VaultFilesService>()(
   "VaultFilesService",
   {
     effect: Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+
       return {
         getFile: (filename: string) =>
           Effect.gen(function* () {
@@ -23,17 +27,24 @@ export class VaultFilesService extends Effect.Service<VaultFilesService>()(
               : `${filename}.md`;
             const filePath = path.join(config.vaultPath, normalizedFilename);
 
-            const file = Bun.file(filePath);
-            const exists = yield* Effect.promise(() => file.exists());
+            const exists = yield* fs.exists(filePath);
 
             if (!exists) {
               return yield* Effect.fail(new HttpApiError.NotFound());
             }
 
-            const content = yield* Effect.promise(() => file.text());
+            const content = yield* fs.readFileString(filePath);
             return content;
-          }),
+          }).pipe(
+            Effect.catchTag("BadArgument", () =>
+              Effect.fail(new HttpApiError.BadRequest()),
+            ),
+            Effect.catchTag("SystemError", () =>
+              Effect.fail(new HttpApiError.NotFound()),
+            ),
+          ),
       };
     }),
+    dependencies: [BunContext.layer],
   },
 ) {}

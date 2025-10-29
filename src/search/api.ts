@@ -25,4 +25,4 @@ export const searchHandlers = HttpApiBuilder.group(api, "Search", (handlers) =>
   ),
 );
 
-export const SearchLive = Layer.provide(searchHandlers, SearchService.Live);
+export const SearchLive = Layer.provide(searchHandlers, SearchService.Default);

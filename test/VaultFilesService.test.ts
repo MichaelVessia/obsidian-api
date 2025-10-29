@@ -15,7 +15,7 @@ describe("VaultFilesService", () => {
       const result = yield* Effect.flip(service.getFile("non-existent-file"));
       expect(result).toBeInstanceOf(HttpApiError.NotFound);
     }).pipe(
-      Effect.provide(Layer.provide(VaultFilesService.Live, testVaultConfig)),
+      Effect.provide(Layer.provide(VaultFilesService.Default, testVaultConfig)),
     ));
 
   it("should normalize filename by adding .md extension", () =>
@@ -26,7 +26,7 @@ describe("VaultFilesService", () => {
       // For non-existent file, should return NotFound error indicating it tried to read test.md
       expect(result).toBeInstanceOf(HttpApiError.NotFound);
     }).pipe(
-      Effect.provide(Layer.provide(VaultFilesService.Live, testVaultConfig)),
+      Effect.provide(Layer.provide(VaultFilesService.Default, testVaultConfig)),
     ));
 
   it("should return BadRequest error for empty filename", () =>
@@ -35,6 +35,6 @@ describe("VaultFilesService", () => {
       const result = yield* Effect.flip(service.getFile(""));
       expect(result).toBeInstanceOf(HttpApiError.BadRequest);
     }).pipe(
-      Effect.provide(Layer.provide(VaultFilesService.Live, testVaultConfig)),
+      Effect.provide(Layer.provide(VaultFilesService.Default, testVaultConfig)),
     ));
 });

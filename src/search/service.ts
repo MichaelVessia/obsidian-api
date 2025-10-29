@@ -1,17 +1,17 @@
+import { FileSystem, Path } from "@effect/platform";
+import { BunContext } from "@effect/platform-bun";
 import { Effect } from "effect";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { VaultConfig } from "../config/vault.js";
 import type { SearchResult } from "./schema.js";
 
 const searchInFile = (
+  fs: FileSystem.FileSystem,
   filePath: string,
   query: string,
   relativePath: string,
 ): Effect.Effect<Array<SearchResult>> =>
   Effect.gen(function* () {
-    const file = Bun.file(filePath);
-    const content = yield* Effect.promise(() => file.text());
+    const content = yield* fs.readFileString(filePath);
     const lines = content.split("\n");
     const results: Array<SearchResult> = [];
 
@@ -35,35 +35,42 @@ const searchInFile = (
     }
 
     return results;
-  });
+  }).pipe(Effect.catchAll(() => Effect.succeed([])));
 
-const walkDirectory = (dirPath: string): Effect.Effect<Array<string>> =>
+const walkDirectory = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  dirPath: string,
+): Effect.Effect<Array<string>> =>
   Effect.gen(function* () {
-    const entries = yield* Effect.promise(() =>
-      fs.promises.readdir(dirPath, { withFileTypes: true }),
-    );
+    const entries = yield* fs.readDirectory(dirPath);
     const files: Array<string> = [];
 
     for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
+      const fullPath = path.join(dirPath, entry);
 
-      if (entry.isDirectory()) {
-        const subFiles = yield* walkDirectory(fullPath);
+      const stat = yield* fs.stat(fullPath);
+
+      if (stat.type === "Directory") {
+        const subFiles = yield* walkDirectory(fs, path, fullPath);
         for (const subFile of subFiles) {
           files.push(subFile);
         }
-      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      } else if (stat.type === "File" && entry.endsWith(".md")) {
         files.push(fullPath);
       }
     }
 
     return files;
-  });
+  }).pipe(Effect.catchAll(() => Effect.succeed([])));
 
 export class SearchService extends Effect.Service<SearchService>()(
   "SearchService",
   {
     effect: Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+
       return {
         simpleSearch: (query: string) =>
           Effect.gen(function* () {
@@ -72,12 +79,13 @@ export class SearchService extends Effect.Service<SearchService>()(
             }
 
             const config = yield* VaultConfig;
-            const files = yield* walkDirectory(config.vaultPath);
+            const files = yield* walkDirectory(fs, path, config.vaultPath);
             const allResults: Array<SearchResult> = [];
 
             for (const filePath of files) {
               const relativePath = path.relative(config.vaultPath, filePath);
               const fileResults = yield* searchInFile(
+                fs,
                 filePath,
                 query,
                 relativePath,
@@ -91,5 +99,6 @@ export class SearchService extends Effect.Service<SearchService>()(
           }),
       };
     }),
+    dependencies: [BunContext.layer],
   },
 ) {}
