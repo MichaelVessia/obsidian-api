@@ -3,8 +3,8 @@ import { Effect, Layer } from "effect";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { VaultConfig } from "../src/config/vault.js";
-import { SearchService } from "../src/search/service.js";
+import { VaultConfig } from "../config/vault.js";
+import { SearchService } from "./service.js";
 
 describe("SearchService", () => {
   const createTestVault = Effect.gen(function* () {

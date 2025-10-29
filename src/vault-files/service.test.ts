@@ -1,8 +1,8 @@
 import { HttpApiError } from "@effect/platform";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { VaultConfig } from "../src/config/vault.js";
-import { VaultFilesService } from "../src/vault-files/service.js";
+import { VaultConfig } from "../config/vault.js";
+import { VaultFilesService } from "./service.js";
 
 describe("VaultFilesService", () => {
   const testVaultConfig = Layer.succeed(VaultConfig, {

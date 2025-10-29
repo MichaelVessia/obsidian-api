@@ -83,6 +83,7 @@ The server uses Effect Platform's HttpApi system with a layered architecture:
 
 ### Project Structure Patterns
 
+- Tests are colocated with source files (e.g., `src/search/service.test.ts` next to `src/search/service.ts`)
 - Tests use `@effect/vitest` and follow the pattern in `test/Dummy.test.ts`
 - TypeScript configuration uses project references with separate configs for src and test
 - ESLint configuration includes Effect-specific rules and formatting via dprint
@@ -94,6 +95,44 @@ The server uses Effect Platform's HttpApi system with a layered architecture:
 - Layer composition with `Layer.provide()` for dependency injection
 - Schema validation with `Schema.String` and parameter definitions
 - Handler functions receive context objects with `params` for path parameters
+
+### Testing Patterns
+
+#### Unit Testing with Mocks
+
+All services and configs export test layers for unit testing without real dependencies:
+
+- **VaultConfigTest(vaultPath)**: Mock vault config
+- **SearchServiceTest(fn)**: Mock search service
+- **VaultFilesServiceTest(fn)**: Mock vault files service
+
+Example usage:
+
+```typescript
+it("should work with mocks", () =>
+  Effect.gen(function* () {
+    const service = yield* SearchService;
+    const results = yield* service.simpleSearch("test");
+    expect(results).toHaveLength(1);
+  }).pipe(
+    Effect.provide(
+      SearchServiceTest(() => Effect.succeed([{ filePath: "test.md", lineNumber: 1, context: "text" }]))
+    )
+  ));
+```
+
+Combine multiple mocks with `Layer.mergeAll()`:
+
+```typescript
+Effect.provide(
+  Layer.mergeAll(
+    SearchServiceTest(...),
+    VaultFilesServiceTest(...)
+  )
+)
+```
+
+See `src/example-integration.test.ts` for full examples.
 
 ### Development Notes
 

@@ -28,3 +28,6 @@ export const VaultConfigLive = Layer.effect(
     };
   }),
 ).pipe(Layer.provide(BunContext.layer));
+
+export const VaultConfigTest = (vaultPath: string) =>
+  Layer.succeed(VaultConfig, { vaultPath });

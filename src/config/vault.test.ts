@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { VaultConfig } from "../src/config/vault.js";
+import { VaultConfig } from "./vault.js";
 
 describe("VaultConfig", () => {
   it("should load vault path from environment variable", () =>

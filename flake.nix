@@ -12,6 +12,7 @@
       default = pkgs.mkShell {
         packages = with pkgs; [
           bun
+          nodejs_22  # Provides npx
           # For systems that do not ship with Python by default (required by `node-gyp`)
           python3
         ];

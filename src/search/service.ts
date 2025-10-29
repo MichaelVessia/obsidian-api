@@ -1,6 +1,6 @@
 import { FileSystem, Path } from "@effect/platform";
 import { BunContext } from "@effect/platform-bun";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import { VaultConfig } from "../config/vault.js";
 import type { SearchResult } from "./schema.js";
 
@@ -102,3 +102,7 @@ export class SearchService extends Effect.Service<SearchService>()(
     dependencies: [BunContext.layer],
   },
 ) {}
+
+export const SearchServiceTest = (
+  simpleSearch: (query: string) => Effect.Effect<Array<SearchResult>>,
+) => Layer.succeed(SearchService, SearchService.make({ simpleSearch }));

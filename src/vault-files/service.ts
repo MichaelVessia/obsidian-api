@@ -1,7 +1,7 @@
 import { HttpApiError } from "@effect/platform";
 import { FileSystem, Path } from "@effect/platform";
 import { BunContext } from "@effect/platform-bun";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import { VaultConfig } from "../config/vault.js";
 
 export class VaultFilesService extends Effect.Service<VaultFilesService>()(
@@ -48,3 +48,10 @@ export class VaultFilesService extends Effect.Service<VaultFilesService>()(
     dependencies: [BunContext.layer],
   },
 ) {}
+
+export const VaultFilesServiceTest = (
+  getFile: (filename: string) => Effect.Effect<
+    string,
+    HttpApiError.BadRequest | HttpApiError.NotFound
+  >,
+) => Layer.succeed(VaultFilesService, VaultFilesService.make({ getFile }));
