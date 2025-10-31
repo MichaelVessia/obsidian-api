@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { VaultConfigTest } from "./config/vault.js";
 import { SearchService, SearchServiceTest } from "./search/service.js";
+import { VaultCache } from "./vault-cache/service.js";
 import {
   VaultFilesService,
   VaultFilesServiceTest,
@@ -44,6 +45,7 @@ describe("Example integration tests with mocks", () => {
       expect(results).toHaveLength(0);
     }).pipe(
       Effect.provide(SearchService.Default),
+      Effect.provide(VaultCache.Default),
       Effect.provide(VaultConfigTest("/tmp/test-vault")),
     ));
 });

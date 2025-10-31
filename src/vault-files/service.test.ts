@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { VaultConfig } from "../config/vault.js";
 import { withTestVault } from "../test-helpers.js";
+import { VaultCache } from "../vault-cache/service.js";
 import { VaultFilesService } from "./service.js";
 
 describe("VaultFilesService", () => {
@@ -15,6 +16,7 @@ describe("VaultFilesService", () => {
         expect(content).toContain("This is a test note with some content.");
       }).pipe(
         Effect.provide(VaultFilesService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -27,6 +29,7 @@ describe("VaultFilesService", () => {
         expect(content).toContain("# Another Note");
       }).pipe(
         Effect.provide(VaultFilesService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -40,6 +43,7 @@ describe("VaultFilesService", () => {
         expect(content).toContain("nested in a subfolder");
       }).pipe(
         Effect.provide(VaultFilesService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -52,6 +56,7 @@ describe("VaultFilesService", () => {
         expect(result).toBeInstanceOf(HttpApiError.NotFound);
       }).pipe(
         Effect.provide(VaultFilesService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -64,6 +69,7 @@ describe("VaultFilesService", () => {
         expect(result).toBeInstanceOf(HttpApiError.BadRequest);
       }).pipe(
         Effect.provide(VaultFilesService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));

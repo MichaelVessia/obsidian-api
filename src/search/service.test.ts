@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { VaultConfig } from "../config/vault.js";
+import { VaultCache } from "../vault-cache/service.js";
 import { SearchService } from "./service.js";
 
 describe("SearchService", () => {
@@ -60,6 +61,7 @@ describe("SearchService", () => {
         expect(result).toEqual([]);
       }).pipe(
         Effect.provide(SearchService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -77,6 +79,7 @@ describe("SearchService", () => {
         expect(result[0].context.toLowerCase()).toContain("test");
       }).pipe(
         Effect.provide(SearchService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -89,6 +92,7 @@ describe("SearchService", () => {
         expect(result).toEqual([]);
       }).pipe(
         Effect.provide(SearchService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
@@ -104,6 +108,7 @@ describe("SearchService", () => {
         expect(result[0].context.toLowerCase()).toContain("nested");
       }).pipe(
         Effect.provide(SearchService.Default),
+        Effect.provide(VaultCache.Default),
         Effect.provide(Layer.succeed(VaultConfig, { vaultPath })),
       ),
     ));
