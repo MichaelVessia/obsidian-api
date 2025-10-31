@@ -47,8 +47,16 @@ bun run lint-fix
 **Type checking:**
 
 ```bash
+bun run typecheck
+```
+
+**Full verification (typecheck + lint + tests):**
+
+```bash
 bun run check
 ```
+
+**IMPORTANT:** Always run `bun run check` after making changes to ensure everything passes before claiming completion.
 
 **Test coverage:**
 
