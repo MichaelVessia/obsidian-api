@@ -8,6 +8,7 @@ import { SearchService } from "../search/service.js"
 import { VaultCache } from "../vault-cache/service.js"
 import { vaultFilesGroup } from "../vault-files/api.js"
 import { VaultFilesService } from "../vault-files/service.js"
+import { VaultStatsService } from "../vault-stats/service.js"
 
 export const api = HttpApi.make("Obsidian API")
   .add(searchGroup)
@@ -52,40 +53,7 @@ const cacheHandlers = HttpApiBuilder.group(api, "Cache", (handlers) =>
           filesLoaded: files.size
         }
       }))
-    .handle("metrics", () =>
-      Effect.gen(function*() {
-        const cache = yield* VaultCache
-        const files = yield* cache.getAllFiles()
-
-        let totalBytes = 0
-        let totalLines = 0
-        let largest = { path: "", bytes: 0 }
-        let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
-
-        for (const [path, content] of files.entries()) {
-          const bytes = new TextEncoder().encode(content).length
-          const lines = content.split("\n").length
-
-          totalBytes += bytes
-          totalLines += lines
-
-          if (bytes > largest.bytes) {
-            largest = { path, bytes }
-          }
-          if (bytes < smallest.bytes) {
-            smallest = { path, bytes }
-          }
-        }
-
-        return {
-          totalFiles: files.size,
-          totalBytes,
-          totalLines,
-          averageFileSize: files.size > 0 ? Math.round(totalBytes / files.size) : 0,
-          largestFile: largest.path ? largest : { path: "none", bytes: 0 },
-          smallestFile: smallest.path ? smallest : { path: "none", bytes: 0 }
-        }
-      })))
+    .handle("metrics", () => Effect.flatMap(VaultStatsService, (service) => service.getMetrics())))
 
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
   Layer.provide(searchHandlers),
@@ -93,6 +61,7 @@ export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
   Layer.provide(cacheHandlers),
   Layer.provide(SearchService.Default),
   Layer.provide(VaultFilesService.Default),
+  Layer.provide(VaultStatsService.Default),
   Layer.provide(VaultCache.Default),
   Layer.provide(VaultConfigLive)
 )
