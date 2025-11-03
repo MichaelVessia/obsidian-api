@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "bun:test"
 import { Effect, Layer } from "effect"
 import { VaultConfig } from "./vault.js"
 

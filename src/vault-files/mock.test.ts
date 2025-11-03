@@ -1,5 +1,5 @@
 import { HttpApiError } from "@effect/platform"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "bun:test"
 import { Effect } from "effect"
 import { VaultFilesService, VaultFilesServiceTest } from "./service.js"
 

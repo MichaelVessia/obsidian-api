@@ -1,5 +1,5 @@
 import { HttpApiError } from "@effect/platform"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "bun:test"
 import { Effect, Layer } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import { withTestVault } from "../test-helpers.js"

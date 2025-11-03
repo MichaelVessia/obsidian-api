@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "bun:test"
 import { Effect } from "effect"
 import { VaultCache, VaultCacheTest } from "./service.js"
 

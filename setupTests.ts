@@ -1,3 +1,2 @@
-import * as it from "@effect/vitest";
-
-it.addEqualityTesters();
+// Setup for Bun test runner
+// @effect/vitest integration not needed with Bun

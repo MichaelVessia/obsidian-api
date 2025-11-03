@@ -1,0 +1,5 @@
+[test]
+preload = ["./setupTests.ts"]
+root = "./src"
+testMatch = ["**/*.test.ts"]
+coverage = true
