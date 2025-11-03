@@ -15,9 +15,13 @@ describe("VaultFilesService", () => {
         expect(content).toContain("# Test Note")
         expect(content).toContain("This is a test note with some content.")
       }).pipe(
-        Effect.provide(VaultFilesService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(
+          Layer.mergeAll(
+            VaultFilesService.Default,
+            VaultCache.Default,
+            Layer.succeed(VaultConfig, { vaultPath })
+          )
+        )
       )
     ))
 
@@ -28,9 +32,13 @@ describe("VaultFilesService", () => {
         const content = yield* service.getFile("another.md")
         expect(content).toContain("# Another Note")
       }).pipe(
-        Effect.provide(VaultFilesService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(
+          Layer.mergeAll(
+            VaultFilesService.Default,
+            VaultCache.Default,
+            Layer.succeed(VaultConfig, { vaultPath })
+          )
+        )
       )
     ))
 
@@ -42,9 +50,13 @@ describe("VaultFilesService", () => {
         expect(content).toContain("# Nested Note")
         expect(content).toContain("nested in a subfolder")
       }).pipe(
-        Effect.provide(VaultFilesService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(
+          Layer.mergeAll(
+            VaultFilesService.Default,
+            VaultCache.Default,
+            Layer.succeed(VaultConfig, { vaultPath })
+          )
+        )
       )
     ))
 
@@ -55,9 +67,13 @@ describe("VaultFilesService", () => {
         const result = yield* Effect.flip(service.getFile("non-existent-file"))
         expect(result).toBeInstanceOf(HttpApiError.NotFound)
       }).pipe(
-        Effect.provide(VaultFilesService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(
+          Layer.mergeAll(
+            VaultFilesService.Default,
+            VaultCache.Default,
+            Layer.succeed(VaultConfig, { vaultPath })
+          )
+        )
       )
     ))
 
@@ -68,9 +84,13 @@ describe("VaultFilesService", () => {
         const result = yield* Effect.flip(service.getFile(""))
         expect(result).toBeInstanceOf(HttpApiError.BadRequest)
       }).pipe(
-        Effect.provide(VaultFilesService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(
+          Layer.mergeAll(
+            VaultFilesService.Default,
+            VaultCache.Default,
+            Layer.succeed(VaultConfig, { vaultPath })
+          )
+        )
       )
     ))
 })
