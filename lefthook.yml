@@ -1,4 +1,8 @@
 pre-commit:
   commands:
+    lint-fix:
+      glob: "*.{ts,mjs}"
+      run: bun run lint-fix {staged_files}
+      stage_fixed: true
     check:
       run: bun run check

@@ -22,8 +22,6 @@
     "build-annotate": "babel build/esm --plugins annotate-pure-calls --out-dir build/esm --source-maps",
     "typecheck": "tsc -b tsconfig.json",
     "check": "bun run typecheck && bun run lint && bun run test run",
-    "format": "prettier --write \"**/*.{ts,mjs,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,mjs,json,md}\"",
     "lint": "eslint \"**/{src,test,examples,scripts,dtslint}/**/*.{ts,mjs}\"",
     "lint-fix": "bun run lint --fix",
     "test": "vitest",
@@ -63,7 +61,6 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-sort-destructure-keys": "^2.0.0",
     "lefthook": "^2.0.2",
-    "prettier": "^3.6.2",
     "tsx": "^4.17.0",
     "typescript": "^5.6.2",
     "vitest": "^3.2.0"
