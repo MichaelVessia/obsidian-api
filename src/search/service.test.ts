@@ -56,9 +56,11 @@ describe("SearchService", () => {
         const result = yield* service.simpleSearch("")
         expect(result).toEqual([])
       }).pipe(
-        Effect.provide(SearchService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(Layer.mergeAll(
+          SearchService.Default,
+          VaultCache.Default,
+          Layer.succeed(VaultConfig, { vaultPath })
+        ))
       )
     ))
 
@@ -74,9 +76,11 @@ describe("SearchService", () => {
         expect(result[0]).toHaveProperty("context")
         expect(result[0].context.toLowerCase()).toContain("test")
       }).pipe(
-        Effect.provide(SearchService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(Layer.mergeAll(
+          SearchService.Default,
+          VaultCache.Default,
+          Layer.succeed(VaultConfig, { vaultPath })
+        ))
       )
     ))
 
@@ -87,9 +91,11 @@ describe("SearchService", () => {
         const result = yield* service.simpleSearch("nonexistentquery")
         expect(result).toEqual([])
       }).pipe(
-        Effect.provide(SearchService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(Layer.mergeAll(
+          SearchService.Default,
+          VaultCache.Default,
+          Layer.succeed(VaultConfig, { vaultPath })
+        ))
       )
     ))
 
@@ -103,9 +109,11 @@ describe("SearchService", () => {
         expect(result[0].filePath).toContain("subfolder")
         expect(result[0].context.toLowerCase()).toContain("nested")
       }).pipe(
-        Effect.provide(SearchService.Default),
-        Effect.provide(VaultCache.Default),
-        Effect.provide(Layer.succeed(VaultConfig, { vaultPath }))
+        Effect.provide(Layer.mergeAll(
+          SearchService.Default,
+          VaultCache.Default,
+          Layer.succeed(VaultConfig, { vaultPath })
+        ))
       )
     ))
 })
