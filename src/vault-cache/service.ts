@@ -218,11 +218,28 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
 
           const cache = yield* Ref.get(cacheRef)
           const results: Array<SearchResult> = []
+          const lowerQuery = query.toLowerCase()
 
+          // Optimized sequential search with pre-lowercased query
           for (const [filePath, content] of cache.entries()) {
-            const fileResults = searchInContent(content, query, filePath)
-            for (const result of fileResults) {
-              results.push(result)
+            const lines = content.split("\n")
+
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i]
+              const lowerLine = line.toLowerCase()
+
+              if (lowerLine.includes(lowerQuery)) {
+                const matchIndex = lowerLine.indexOf(lowerQuery)
+                const start = Math.max(0, matchIndex - 100)
+                const end = Math.min(line.length, matchIndex + query.length + 100)
+                const context = line.slice(start, end)
+
+                results.push({
+                  filePath,
+                  lineNumber: i + 1,
+                  context
+                })
+              }
             }
           }
 
