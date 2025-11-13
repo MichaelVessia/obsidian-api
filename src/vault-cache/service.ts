@@ -1,7 +1,6 @@
 import { FileSystem, Path } from "@effect/platform"
 import { BunContext } from "@effect/platform-bun"
-import { Effect, Layer, Ref } from "effect"
-import { watch } from "node:fs"
+import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import type { SearchResult } from "../search/schema.js"
 
@@ -27,7 +26,12 @@ const walkDirectory = (
       const stat = yield* fs.stat(fullPath)
 
       if (stat.type === "Directory") {
-        const subFiles = yield* walkDirectory(fs, path, fullPath, ignorePatterns)
+        const subFiles = yield* walkDirectory(
+          fs,
+          path,
+          fullPath,
+          ignorePatterns
+        )
         for (const file of subFiles) {
           files.push(file)
         }
@@ -42,10 +46,7 @@ const walkDirectory = (
 const loadFileContent = (
   fs: FileSystem.FileSystem,
   filePath: string
-): Effect.Effect<string> =>
-  fs
-    .readFileString(filePath)
-    .pipe(Effect.catchAll(() => Effect.succeed("")))
+): Effect.Effect<string> => fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
 
 const loadAllFiles = (
   fs: FileSystem.FileSystem,
@@ -104,7 +105,9 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
     // Initialize cache
     const initialCache = yield* loadAllFiles(fs, path, config.vaultPath)
     const cacheRef = yield* Ref.make(initialCache)
-    yield* Effect.logInfo(`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`).pipe(
+    yield* Effect.logInfo(
+      `Cache initialized with ${initialCache.size} files from ${config.vaultPath}`
+    ).pipe(
       Effect.annotateLogs({
         vaultPath: config.vaultPath,
         fileCount: initialCache.size
@@ -149,33 +152,33 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
         }
       }).pipe(Effect.catchAll(() => Effect.void))
 
-    const scheduleUpdate = (filename: string | null): void => {
-      if (!filename) return
-
-      const fullPath = path.join(config.vaultPath, filename)
-
+    const scheduleUpdate = (filePath: string): void => {
       // Clear existing timeout for this file
-      const existing = pendingUpdates.get(fullPath)
+      const existing = pendingUpdates.get(filePath)
       if (existing) {
         clearTimeout(existing)
       }
 
       // Schedule debounced update
       const timeout = setTimeout(() => {
-        pendingUpdates.delete(fullPath)
-        Effect.runPromise(updateFile(fullPath))
+        pendingUpdates.delete(filePath)
+        Effect.runPromise(updateFile(filePath))
       }, DEBOUNCE_MS)
 
-      pendingUpdates.set(fullPath, timeout)
+      pendingUpdates.set(filePath, timeout)
     }
 
-    // Set up file watcher
-    const watcher = watch(
-      config.vaultPath,
-      { recursive: true },
-      (_eventType, filename) => {
-        scheduleUpdate(filename)
-      }
+    // Set up file watcher using Effect's FileSystem API
+    const watchFiber = yield* Effect.fork(
+      fs.watch(config.vaultPath, { recursive: true }).pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event.path.endsWith(".md")) {
+              scheduleUpdate(event.path)
+            }
+          })
+        )
+      )
     )
     yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
       Effect.annotateLogs({ vaultPath: config.vaultPath }),
@@ -184,8 +187,8 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
 
     // Cleanup watcher on scope release
     yield* Effect.addFinalizer(() =>
-      Effect.sync(() => {
-        watcher.close()
+      Effect.gen(function*() {
+        yield* Fiber.interrupt(watchFiber)
         // Clear any pending timeouts
         for (const timeout of pendingUpdates.values()) {
           clearTimeout(timeout)
@@ -230,7 +233,9 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
         Effect.gen(function*() {
           const newCache = yield* loadAllFiles(fs, path, config.vaultPath)
           yield* Ref.set(cacheRef, newCache)
-          yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
+          yield* Effect.logInfo(
+            `Cache manually reloaded with ${newCache.size} files`
+          ).pipe(
             Effect.annotateLogs({
               vaultPath: config.vaultPath,
               fileCount: newCache.size
