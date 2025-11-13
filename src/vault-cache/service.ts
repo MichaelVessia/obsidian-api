@@ -55,15 +55,19 @@ const loadAllFiles = (
 ): Effect.Effect<Map<string, string>> =>
   Effect.gen(function*() {
     const files = yield* walkDirectory(fs, path, vaultPath)
-    const cache = new Map<string, string>()
 
-    for (const filePath of files) {
-      const relativePath = path.relative(vaultPath, filePath)
-      const content = yield* loadFileContent(fs, filePath)
-      cache.set(relativePath, content)
-    }
+    const fileContents = yield* Effect.forEach(
+      files,
+      (filePath) =>
+        Effect.gen(function*() {
+          const relativePath = path.relative(vaultPath, filePath)
+          const content = yield* loadFileContent(fs, filePath)
+          return [relativePath, content] as const
+        }),
+      { concurrency: 10 }
+    )
 
-    return cache
+    return new Map(fileContents)
   })
 
 const searchInContent = (
