@@ -5,8 +5,6 @@ import { watch } from "node:fs"
 import { VaultConfig } from "../config/vault.js"
 import type { SearchResult } from "../search/schema.js"
 
-const log = (message: string) => Effect.sync(() => console.log(`[VaultCache] ${message}`))
-
 const DEBOUNCE_MS = 100
 
 const walkDirectory = (
@@ -106,7 +104,13 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
     // Initialize cache
     const initialCache = yield* loadAllFiles(fs, path, config.vaultPath)
     const cacheRef = yield* Ref.make(initialCache)
-    yield* log(`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`)
+    yield* Effect.logInfo(`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`).pipe(
+      Effect.annotateLogs({
+        vaultPath: config.vaultPath,
+        fileCount: initialCache.size
+      }),
+      Effect.ignore
+    )
 
     // Track pending updates to debounce rapid changes
     const pendingUpdates = new Map<string, NodeJS.Timeout>()
@@ -125,7 +129,10 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
               newCache.set(relativePath, content)
               return newCache
             })
-            yield* log(`File updated: ${relativePath}`)
+            yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
+              Effect.annotateLogs({ filePath: relativePath }),
+              Effect.ignore
+            )
           }
         } else {
           // File deleted
@@ -135,7 +142,10 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
             newCache.delete(relativePath)
             return newCache
           })
-          yield* log(`File deleted: ${relativePath}`)
+          yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(
+            Effect.annotateLogs({ filePath: relativePath }),
+            Effect.ignore
+          )
         }
       }).pipe(Effect.catchAll(() => Effect.void))
 
@@ -167,7 +177,10 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
         scheduleUpdate(filename)
       }
     )
-    yield* log(`File watcher started on ${config.vaultPath}`)
+    yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
+      Effect.annotateLogs({ vaultPath: config.vaultPath }),
+      Effect.ignore
+    )
 
     // Cleanup watcher on scope release
     yield* Effect.addFinalizer(() =>
@@ -217,7 +230,13 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
         Effect.gen(function*() {
           const newCache = yield* loadAllFiles(fs, path, config.vaultPath)
           yield* Ref.set(cacheRef, newCache)
-          yield* log(`Cache manually reloaded with ${newCache.size} files`)
+          yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
+            Effect.annotateLogs({
+              vaultPath: config.vaultPath,
+              fileCount: newCache.size
+            }),
+            Effect.ignore
+          )
         })
     }
   }),
