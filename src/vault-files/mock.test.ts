@@ -22,6 +22,7 @@ describe("VaultFilesService with mocks", () => {
       const result = yield* Effect.flip(service.getFile("missing.md"))
 
       expect(result).toBeInstanceOf(HttpApiError.NotFound)
+      expect(result._tag).toBe("NotFound")
     }).pipe(
       Effect.provide(
         VaultFilesServiceTest(() => Effect.fail(new HttpApiError.NotFound()))

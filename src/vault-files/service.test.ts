@@ -66,6 +66,7 @@ describe("VaultFilesService", () => {
         const service = yield* VaultFilesService
         const result = yield* Effect.flip(service.getFile("non-existent-file"))
         expect(result).toBeInstanceOf(HttpApiError.NotFound)
+        expect(result._tag).toBe("NotFound")
       }).pipe(
         Effect.provide(
           Layer.mergeAll(
@@ -83,6 +84,7 @@ describe("VaultFilesService", () => {
         const service = yield* VaultFilesService
         const result = yield* Effect.flip(service.getFile(""))
         expect(result).toBeInstanceOf(HttpApiError.BadRequest)
+        expect(result._tag).toBe("BadRequest")
       }).pipe(
         Effect.provide(
           Layer.mergeAll(
