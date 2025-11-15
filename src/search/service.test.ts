@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { VaultConfig } from "../config/vault.js"
-import { VaultCache } from "../vault-cache/service.js"
+import { VaultService } from "../vault/service.js"
 import { SearchService, SearchServiceTest } from "./service.js"
 
 describe("SearchService", () => {
@@ -48,7 +48,7 @@ describe("SearchService", () => {
 				expect(result).toEqual([])
 			}).pipe(
 				Effect.provide(
-					Layer.mergeAll(SearchService.Default, VaultCache.Default, Layer.succeed(VaultConfig, { vaultPath }))
+					Layer.mergeAll(SearchService.Default, VaultService.Default, Layer.succeed(VaultConfig, { vaultPath }))
 				)
 			)
 		))
@@ -66,7 +66,7 @@ describe("SearchService", () => {
 				expect(result[0].context.toLowerCase()).toContain("test")
 			}).pipe(
 				Effect.provide(
-					Layer.mergeAll(SearchService.Default, VaultCache.Default, Layer.succeed(VaultConfig, { vaultPath }))
+					Layer.mergeAll(SearchService.Default, VaultService.Default, Layer.succeed(VaultConfig, { vaultPath }))
 				)
 			)
 		))
@@ -79,7 +79,7 @@ describe("SearchService", () => {
 				expect(result).toEqual([])
 			}).pipe(
 				Effect.provide(
-					Layer.mergeAll(SearchService.Default, VaultCache.Default, Layer.succeed(VaultConfig, { vaultPath }))
+					Layer.mergeAll(SearchService.Default, VaultService.Default, Layer.succeed(VaultConfig, { vaultPath }))
 				)
 			)
 		))
@@ -95,7 +95,7 @@ describe("SearchService", () => {
 				expect(result[0].context.toLowerCase()).toContain("nested")
 			}).pipe(
 				Effect.provide(
-					Layer.mergeAll(SearchService.Default, VaultCache.Default, Layer.succeed(VaultConfig, { vaultPath }))
+					Layer.mergeAll(SearchService.Default, VaultService.Default, Layer.succeed(VaultConfig, { vaultPath }))
 				)
 			)
 		))

@@ -1,16 +1,14 @@
 import { HttpApi, HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from "@effect/platform"
 import { BunHttpServer } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
-import { vaultCacheGroup } from "../vault-cache/api.js"
 import { VaultConfigLive } from "../config/vault.js"
 import { searchGroup } from "../search/api.js"
 import { SearchService } from "../search/service.js"
-import { VaultCache } from "../vault-cache/service.js"
-import { vaultFilesGroup } from "../vault-files/api.js"
-import { VaultFilesService } from "../vault-files/service.js"
+import { vaultGroup } from "../vault/api.js"
+import { VaultService } from "../vault/service.js"
 import { VaultStatsService } from "../vault-stats/service.js"
 
-export const api = HttpApi.make("Obsidian API").add(searchGroup).add(vaultFilesGroup).add(vaultCacheGroup)
+export const api = HttpApi.make("Obsidian API").add(searchGroup).add(vaultGroup)
 
 const searchHandlers = HttpApiBuilder.group(api, "Search", (handlers) =>
 	handlers.handle("simple", ({ path: { query } }) =>
@@ -18,28 +16,25 @@ const searchHandlers = HttpApiBuilder.group(api, "Search", (handlers) =>
 	)
 )
 
-const vaultFilesHandlers = HttpApiBuilder.group(api, "Vault Files", (handlers) =>
-	handlers.handle("getFile", ({ path: { filename } }) =>
-		Effect.flatMap(VaultFilesService, (service) => service.getFile(filename))
-	)
-)
-
-const vaultCacheHandlers = HttpApiBuilder.group(api, "Vault Cache", (handlers) =>
+const vaultHandlers = HttpApiBuilder.group(api, "Vault", (handlers) =>
 	handlers
+		.handle("getFile", ({ path: { filename } }) =>
+			Effect.flatMap(VaultService, (service) => service.getFileContent(filename))
+		)
 		.handle("listFiles", () =>
 			Effect.gen(function* () {
-				const cache = yield* VaultCache
-				const files = yield* cache.getAllFiles()
+				const vault = yield* VaultService
+				const files = yield* vault.getAllFiles()
 				return Object.fromEntries(files)
 			})
 		)
 		.handle("reload", () =>
 			Effect.gen(function* () {
-				const cache = yield* VaultCache
-				yield* cache.reload()
-				const files = yield* cache.getAllFiles()
+				const vault = yield* VaultService
+				yield* vault.reload()
+				const files = yield* vault.getAllFiles()
 				return {
-					message: "Cache reloaded successfully",
+					message: "Vault reloaded successfully",
 					filesLoaded: files.size
 				}
 			})
@@ -49,12 +44,10 @@ const vaultCacheHandlers = HttpApiBuilder.group(api, "Vault Cache", (handlers) =
 
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
 	Layer.provide(searchHandlers),
-	Layer.provide(vaultFilesHandlers),
-	Layer.provide(vaultCacheHandlers),
+	Layer.provide(vaultHandlers),
 	Layer.provide(SearchService.Default),
-	Layer.provide(VaultFilesService.Default),
 	Layer.provide(VaultStatsService.Default),
-	Layer.provide(VaultCache.Default),
+	Layer.provide(VaultService.Default),
 	Layer.provide(VaultConfigLive)
 )
 

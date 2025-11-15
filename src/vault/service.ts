@@ -1,4 +1,4 @@
-import { FileSystem, Path } from "@effect/platform"
+import { FileSystem, HttpApiError, Path } from "@effect/platform"
 import { BunContext } from "@effect/platform-bun"
 import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
@@ -89,7 +89,7 @@ const searchInContent = (content: string, query: string, filePath: string): Arra
 	return results
 }
 
-export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
+export class VaultService extends Effect.Service<VaultService>()("VaultService", {
 	scoped: Effect.gen(function* () {
 		const fs = yield* FileSystem.FileSystem
 		const path = yield* Path.Path
@@ -195,6 +195,29 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
 					return cache.get(relativePath)
 				}),
 
+			// HTTP-friendly getFile with error handling and filename normalization
+			getFileContent: (filename: string) =>
+				Effect.gen(function* () {
+					// Early return with BadRequest error for invalid input
+					if (!filename || filename.trim() === "") {
+						return yield* Effect.fail(new HttpApiError.BadRequest())
+					}
+
+					// Normalize filename to always end with .md
+					const normalizedFilename = filename.endsWith(".md") ? filename : `${filename}.md`
+
+					// Get content from cache
+					const cache = yield* Ref.get(cacheRef)
+					const content = cache.get(normalizedFilename)
+
+					// Convert undefined to NotFound error for API consistency
+					if (content === undefined) {
+						return yield* Effect.fail(new HttpApiError.NotFound())
+					}
+
+					return content
+				}),
+
 			getAllFiles: () =>
 				Effect.gen(function* () {
 					const cache = yield* Ref.get(cacheRef)
@@ -254,11 +277,22 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
 	dependencies: [BunContext.layer]
 }) {}
 
-export const VaultCacheTest = (cache: Map<string, string>) =>
+export const VaultServiceTest = (cache: Map<string, string>) =>
 	Layer.succeed(
-		VaultCache,
-		VaultCache.make({
+		VaultService,
+		VaultService.make({
 			getFile: (relativePath: string) => Effect.succeed(cache.get(relativePath)),
+			getFileContent: (filename: string) => {
+				if (!filename || filename.trim() === "") {
+					return Effect.fail(new HttpApiError.BadRequest())
+				}
+				const normalizedFilename = filename.endsWith(".md") ? filename : `${filename}.md`
+				const content = cache.get(normalizedFilename)
+				if (content === undefined) {
+					return Effect.fail(new HttpApiError.NotFound())
+				}
+				return Effect.succeed(content)
+			},
 			getAllFiles: () => Effect.succeed(new Map(cache)),
 			searchInFiles: (query: string) => {
 				if (!query || query.trim() === "") {

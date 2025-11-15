@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect"
-import { VaultCache } from "../vault-cache/service.js"
+import { VaultService } from "../vault/service.js"
 
 export interface VaultMetrics {
 	totalFiles: number
@@ -12,12 +12,12 @@ export interface VaultMetrics {
 
 export class VaultStatsService extends Effect.Service<VaultStatsService>()("VaultStatsService", {
 	effect: Effect.gen(function* () {
-		const cache = yield* VaultCache
+		const vault = yield* VaultService
 
 		return {
 			getMetrics: (): Effect.Effect<VaultMetrics> =>
 				Effect.gen(function* () {
-					const files = yield* cache.getAllFiles()
+					const files = yield* vault.getAllFiles()
 
 					let totalBytes = 0
 					let totalLines = 0

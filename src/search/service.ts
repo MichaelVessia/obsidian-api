@@ -1,13 +1,13 @@
 import { Effect, Layer } from "effect"
-import { VaultCache } from "../vault-cache/service.js"
+import { VaultService } from "../vault/service.js"
 import type { SearchResult } from "./schema.js"
 
 export class SearchService extends Effect.Service<SearchService>()("SearchService", {
 	effect: Effect.gen(function* () {
-		const cache = yield* VaultCache
+		const vault = yield* VaultService
 
 		return {
-			simpleSearch: (query: string) => cache.searchInFiles(query)
+			simpleSearch: (query: string) => vault.searchInFiles(query)
 		}
 	})
 }) {}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { Effect } from "effect"
-import { VaultCacheTest } from "../vault-cache/service.js"
+import { VaultServiceTest } from "../vault/service.js"
 import { VaultStatsService } from "./service.js"
 
 describe("VaultStatsService", () => {
@@ -17,7 +17,7 @@ describe("VaultStatsService", () => {
 				largestFile: { path: "none", bytes: 0 },
 				smallestFile: { path: "none", bytes: 0 }
 			})
-		}).pipe(Effect.provide(VaultStatsService.Default), Effect.provide(VaultCacheTest(new Map()))))
+		}).pipe(Effect.provide(VaultStatsService.Default), Effect.provide(VaultServiceTest(new Map()))))
 
 	it("should calculate metrics for single file", () =>
 		Effect.gen(function* () {
@@ -30,7 +30,7 @@ describe("VaultStatsService", () => {
 			expect(metrics.smallestFile.path).toBe("test.md")
 		}).pipe(
 			Effect.provide(VaultStatsService.Default),
-			Effect.provide(VaultCacheTest(new Map([["test.md", "Line 1\nLine 2\nLine 3"]])))
+			Effect.provide(VaultServiceTest(new Map([["test.md", "Line 1\nLine 2\nLine 3"]])))
 		))
 
 	it("should calculate metrics for multiple files", () =>
@@ -45,7 +45,7 @@ describe("VaultStatsService", () => {
 		}).pipe(
 			Effect.provide(VaultStatsService.Default),
 			Effect.provide(
-				VaultCacheTest(
+				VaultServiceTest(
 					new Map([
 						["small.md", "Short"],
 						["medium.md", "Line 1\nLine 2\nLine 3"],
@@ -63,5 +63,8 @@ describe("VaultStatsService", () => {
 			const metrics = yield* service.getMetrics()
 
 			expect(metrics.totalBytes).toBe(expectedBytes)
-		}).pipe(Effect.provide(VaultStatsService.Default), Effect.provide(VaultCacheTest(new Map([["test.md", "Hello"]])))))
+		}).pipe(
+			Effect.provide(VaultStatsService.Default),
+			Effect.provide(VaultServiceTest(new Map([["test.md", "Hello"]])))
+		))
 })
