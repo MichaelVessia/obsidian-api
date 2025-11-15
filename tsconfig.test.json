@@ -1,10 +1,10 @@
 {
-  "extends": "./tsconfig.base.json",
-  "include": ["test", "src/**/*.test.ts"],
-  "references": [{ "path": "tsconfig.src.json" }],
-  "compilerOptions": {
-    "types": ["node"],
-    "tsBuildInfoFile": ".tsbuildinfo/test.tsbuildinfo",
-    "noEmit": true
-  }
+	"extends": "./tsconfig.base.json",
+	"include": ["test", "src/**/*.test.ts"],
+	"references": [{ "path": "tsconfig.src.json" }],
+	"compilerOptions": {
+		"types": ["node"],
+		"tsBuildInfoFile": ".tsbuildinfo/test.tsbuildinfo",
+		"noEmit": true
+	}
 }

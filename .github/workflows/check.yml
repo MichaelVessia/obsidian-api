@@ -46,6 +46,16 @@ jobs:
         uses: ./.github/actions/setup
       - run: pnpm lint
 
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        uses: ./.github/actions/setup
+      - run: pnpm format
+
   test:
     name: Test 
     runs-on: ubuntu-latest

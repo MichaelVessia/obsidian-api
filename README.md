@@ -71,8 +71,13 @@ bun run build
 bun run test
 ```
 
-**Linting**
+**Linting & Formatting**
 
 ```sh
-bun run lint
+bun run lint        # Check code style
+bun run lint-fix    # Auto-fix linting issues
+bun run format      # Check formatting
+bun run format-fix  # Auto-format code
 ```
+
+> **Note**: This project uses Biome for linting and formatting. On NixOS, the scripts automatically fall back to using the Nix development environment.
