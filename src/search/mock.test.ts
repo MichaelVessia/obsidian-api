@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
-import { Effect } from "effect";
-import { SearchService, SearchServiceTest } from "./service.js";
+import { describe, expect, it } from "bun:test"
+import { Effect } from "effect"
+import { SearchService, SearchServiceTest } from "./service.js"
 
 describe("SearchService with mocks", () => {
 	it("should return search results from mock", () =>
 		Effect.gen(function* () {
-			const service = yield* SearchService;
-			const results = yield* service.simpleSearch("test");
+			const service = yield* SearchService
+			const results = yield* service.simpleSearch("test")
 
-			expect(results).toHaveLength(1);
-			expect(results[0].filePath).toBe("test.md");
+			expect(results).toHaveLength(1)
+			expect(results[0].filePath).toBe("test.md")
 		}).pipe(
 			Effect.provide(
 				SearchServiceTest(() =>
@@ -17,18 +17,18 @@ describe("SearchService with mocks", () => {
 						{
 							filePath: "test.md",
 							lineNumber: 1,
-							context: "test content",
-						},
-					]),
-				),
-			),
-		));
+							context: "test content"
+						}
+					])
+				)
+			)
+		))
 
 	it("should handle empty results from mock", () =>
 		Effect.gen(function* () {
-			const service = yield* SearchService;
-			const results = yield* service.simpleSearch("query");
+			const service = yield* SearchService
+			const results = yield* service.simpleSearch("query")
 
-			expect(results).toHaveLength(0);
-		}).pipe(Effect.provide(SearchServiceTest(() => Effect.succeed([])))));
-});
+			expect(results).toHaveLength(0)
+		}).pipe(Effect.provide(SearchServiceTest(() => Effect.succeed([])))))
+})

@@ -1,177 +1,163 @@
-import { FileSystem, Path } from "@effect/platform";
-import { BunContext } from "@effect/platform-bun";
-import { Effect, Fiber, Layer, Ref, Stream } from "effect";
-import { VaultConfig } from "../config/vault.js";
-import type { SearchResult } from "../search/schema.js";
+import { FileSystem, Path } from "@effect/platform"
+import { BunContext } from "@effect/platform-bun"
+import { Effect, Fiber, Layer, Ref, Stream } from "effect"
+import { VaultConfig } from "../config/vault.js"
+import type { SearchResult } from "../search/schema.js"
 
-const DEBOUNCE_MS = 100;
+const DEBOUNCE_MS = 100
 
 const walkDirectory = (
 	fs: FileSystem.FileSystem,
 	path: Path.Path,
 	dirPath: string,
-	ignorePatterns: Array<string> = [".obsidian"],
+	ignorePatterns: Array<string> = [".obsidian"]
 ): Effect.Effect<Array<string>> =>
 	Effect.gen(function* () {
-		const entries = yield* fs.readDirectory(dirPath);
-		const files: Array<string> = [];
+		const entries = yield* fs.readDirectory(dirPath)
+		const files: Array<string> = []
 
 		for (const entry of entries) {
 			// Skip ignored directories
 			if (ignorePatterns.some((pattern) => entry.includes(pattern))) {
-				continue;
+				continue
 			}
 
-			const fullPath = path.join(dirPath, entry);
-			const stat = yield* fs.stat(fullPath);
+			const fullPath = path.join(dirPath, entry)
+			const stat = yield* fs.stat(fullPath)
 
 			if (stat.type === "Directory") {
-				const subFiles = yield* walkDirectory(
-					fs,
-					path,
-					fullPath,
-					ignorePatterns,
-				);
+				const subFiles = yield* walkDirectory(fs, path, fullPath, ignorePatterns)
 				for (const file of subFiles) {
-					files.push(file);
+					files.push(file)
 				}
 			} else if (stat.type === "File" && entry.endsWith(".md")) {
-				files.push(fullPath);
+				files.push(fullPath)
 			}
 		}
 
-		return files;
-	}).pipe(Effect.catchAll(() => Effect.succeed([])));
+		return files
+	}).pipe(Effect.catchAll(() => Effect.succeed([])))
 
-const loadFileContent = (
-	fs: FileSystem.FileSystem,
-	filePath: string,
-): Effect.Effect<string> =>
-	fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")));
+const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Effect<string> =>
+	fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
 
 const loadAllFiles = (
 	fs: FileSystem.FileSystem,
 	path: Path.Path,
-	vaultPath: string,
+	vaultPath: string
 ): Effect.Effect<Map<string, string>> =>
 	Effect.gen(function* () {
-		const files = yield* walkDirectory(fs, path, vaultPath);
+		const files = yield* walkDirectory(fs, path, vaultPath)
 
 		const fileContents = yield* Effect.forEach(
 			files,
 			(filePath) =>
 				Effect.gen(function* () {
-					const relativePath = path.relative(vaultPath, filePath);
-					const content = yield* loadFileContent(fs, filePath);
-					return [relativePath, content] as const;
+					const relativePath = path.relative(vaultPath, filePath)
+					const content = yield* loadFileContent(fs, filePath)
+					return [relativePath, content] as const
 				}),
-			{ concurrency: 10 },
-		);
+			{ concurrency: 10 }
+		)
 
-		return new Map(fileContents);
-	});
+		return new Map(fileContents)
+	})
 
-const searchInContent = (
-	content: string,
-	query: string,
-	filePath: string,
-): Array<SearchResult> => {
-	const lines = content.split("\n");
-	const results: Array<SearchResult> = [];
-	const lowerQuery = query.toLowerCase();
+const searchInContent = (content: string, query: string, filePath: string): Array<SearchResult> => {
+	const lines = content.split("\n")
+	const results: Array<SearchResult> = []
+	const lowerQuery = query.toLowerCase()
 
 	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const lowerLine = line.toLowerCase();
+		const line = lines[i]
+		const lowerLine = line.toLowerCase()
 
 		if (lowerLine.includes(lowerQuery)) {
-			const matchIndex = lowerLine.indexOf(lowerQuery);
-			const start = Math.max(0, matchIndex - 100);
-			const end = Math.min(line.length, matchIndex + query.length + 100);
-			const context = line.slice(start, end);
+			const matchIndex = lowerLine.indexOf(lowerQuery)
+			const start = Math.max(0, matchIndex - 100)
+			const end = Math.min(line.length, matchIndex + query.length + 100)
+			const context = line.slice(start, end)
 
 			results.push({
 				filePath,
 				lineNumber: i + 1,
-				context,
-			});
+				context
+			})
 		}
 	}
 
-	return results;
-};
+	return results
+}
 
 export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
 	scoped: Effect.gen(function* () {
-		const fs = yield* FileSystem.FileSystem;
-		const path = yield* Path.Path;
-		const config = yield* VaultConfig;
+		const fs = yield* FileSystem.FileSystem
+		const path = yield* Path.Path
+		const config = yield* VaultConfig
 
 		// Initialize cache
-		const initialCache = yield* loadAllFiles(fs, path, config.vaultPath);
-		const cacheRef = yield* Ref.make(initialCache);
-		yield* Effect.logInfo(
-			`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`,
-		).pipe(
+		const initialCache = yield* loadAllFiles(fs, path, config.vaultPath)
+		const cacheRef = yield* Ref.make(initialCache)
+		yield* Effect.logInfo(`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`).pipe(
 			Effect.annotateLogs({
 				vaultPath: config.vaultPath,
-				fileCount: initialCache.size,
+				fileCount: initialCache.size
 			}),
-			Effect.ignore,
-		);
+			Effect.ignore
+		)
 
 		// Track pending updates to debounce rapid changes
-		const pendingUpdates = new Map<string, NodeJS.Timeout>();
+		const pendingUpdates = new Map<string, NodeJS.Timeout>()
 
 		const updateFile = (filePath: string): Effect.Effect<void> =>
 			Effect.gen(function* () {
-				const exists = yield* fs.exists(filePath);
+				const exists = yield* fs.exists(filePath)
 
 				if (exists) {
-					const stat = yield* fs.stat(filePath);
+					const stat = yield* fs.stat(filePath)
 					if (stat.type === "File" && filePath.endsWith(".md")) {
-						const content = yield* loadFileContent(fs, filePath);
-						const relativePath = path.relative(config.vaultPath, filePath);
+						const content = yield* loadFileContent(fs, filePath)
+						const relativePath = path.relative(config.vaultPath, filePath)
 						yield* Ref.update(cacheRef, (cache) => {
-							const newCache = new Map(cache);
-							newCache.set(relativePath, content);
-							return newCache;
-						});
+							const newCache = new Map(cache)
+							newCache.set(relativePath, content)
+							return newCache
+						})
 						yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
 							Effect.annotateLogs({ filePath: relativePath }),
-							Effect.ignore,
-						);
+							Effect.ignore
+						)
 					}
 				} else {
 					// File deleted
-					const relativePath = path.relative(config.vaultPath, filePath);
+					const relativePath = path.relative(config.vaultPath, filePath)
 					yield* Ref.update(cacheRef, (cache) => {
-						const newCache = new Map(cache);
-						newCache.delete(relativePath);
-						return newCache;
-					});
+						const newCache = new Map(cache)
+						newCache.delete(relativePath)
+						return newCache
+					})
 					yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(
 						Effect.annotateLogs({ filePath: relativePath }),
-						Effect.ignore,
-					);
+						Effect.ignore
+					)
 				}
-			}).pipe(Effect.catchAll(() => Effect.void));
+			}).pipe(Effect.catchAll(() => Effect.void))
 
 		const scheduleUpdate = (filePath: string): void => {
 			// Clear existing timeout for this file
-			const existing = pendingUpdates.get(filePath);
+			const existing = pendingUpdates.get(filePath)
 			if (existing) {
-				clearTimeout(existing);
+				clearTimeout(existing)
 			}
 
 			// Schedule debounced update
 			const timeout = setTimeout(() => {
-				pendingUpdates.delete(filePath);
-				Effect.runPromise(updateFile(filePath));
-			}, DEBOUNCE_MS);
+				pendingUpdates.delete(filePath)
+				Effect.runPromise(updateFile(filePath))
+			}, DEBOUNCE_MS)
 
-			pendingUpdates.set(filePath, timeout);
-		};
+			pendingUpdates.set(filePath, timeout)
+		}
 
 		// Set up file watcher using Effect's FileSystem API
 		const watchFiber = yield* Effect.fork(
@@ -179,120 +165,114 @@ export class VaultCache extends Effect.Service<VaultCache>()("VaultCache", {
 				Stream.runForEach((event) =>
 					Effect.sync(() => {
 						if (event.path.endsWith(".md")) {
-							scheduleUpdate(event.path);
+							scheduleUpdate(event.path)
 						}
-					}),
-				),
-			),
-		);
+					})
+				)
+			)
+		)
 		yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
 			Effect.annotateLogs({ vaultPath: config.vaultPath }),
-			Effect.ignore,
-		);
+			Effect.ignore
+		)
 
 		// Cleanup watcher on scope release
 		yield* Effect.addFinalizer(() =>
 			Effect.gen(function* () {
-				yield* Fiber.interrupt(watchFiber);
+				yield* Fiber.interrupt(watchFiber)
 				// Clear any pending timeouts
 				for (const timeout of pendingUpdates.values()) {
-					clearTimeout(timeout);
+					clearTimeout(timeout)
 				}
-				pendingUpdates.clear();
-			}),
-		);
+				pendingUpdates.clear()
+			})
+		)
 
 		return {
 			getFile: (relativePath: string) =>
 				Effect.gen(function* () {
-					const cache = yield* Ref.get(cacheRef);
-					return cache.get(relativePath);
+					const cache = yield* Ref.get(cacheRef)
+					return cache.get(relativePath)
 				}),
 
 			getAllFiles: () =>
 				Effect.gen(function* () {
-					const cache = yield* Ref.get(cacheRef);
-					return new Map(cache);
+					const cache = yield* Ref.get(cacheRef)
+					return new Map(cache)
 				}),
 
 			searchInFiles: (query: string) =>
 				Effect.gen(function* () {
 					if (!query || query.trim() === "") {
-						return [];
+						return []
 					}
 
-					const cache = yield* Ref.get(cacheRef);
-					const results: Array<SearchResult> = [];
-					const lowerQuery = query.toLowerCase();
+					const cache = yield* Ref.get(cacheRef)
+					const results: Array<SearchResult> = []
+					const lowerQuery = query.toLowerCase()
 
 					// Optimized sequential search with pre-lowercased query
 					for (const [filePath, content] of cache.entries()) {
-						const lines = content.split("\n");
+						const lines = content.split("\n")
 
 						for (let i = 0; i < lines.length; i++) {
-							const line = lines[i];
-							const lowerLine = line.toLowerCase();
+							const line = lines[i]
+							const lowerLine = line.toLowerCase()
 
 							if (lowerLine.includes(lowerQuery)) {
-								const matchIndex = lowerLine.indexOf(lowerQuery);
-								const start = Math.max(0, matchIndex - 100);
-								const end = Math.min(
-									line.length,
-									matchIndex + query.length + 100,
-								);
-								const context = line.slice(start, end);
+								const matchIndex = lowerLine.indexOf(lowerQuery)
+								const start = Math.max(0, matchIndex - 100)
+								const end = Math.min(line.length, matchIndex + query.length + 100)
+								const context = line.slice(start, end)
 
 								results.push({
 									filePath,
 									lineNumber: i + 1,
-									context,
-								});
+									context
+								})
 							}
 						}
 					}
 
-					return results;
+					return results
 				}),
 
 			reload: () =>
 				Effect.gen(function* () {
-					const newCache = yield* loadAllFiles(fs, path, config.vaultPath);
-					yield* Ref.set(cacheRef, newCache);
-					yield* Effect.logInfo(
-						`Cache manually reloaded with ${newCache.size} files`,
-					).pipe(
+					const newCache = yield* loadAllFiles(fs, path, config.vaultPath)
+					yield* Ref.set(cacheRef, newCache)
+					yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
 						Effect.annotateLogs({
 							vaultPath: config.vaultPath,
-							fileCount: newCache.size,
+							fileCount: newCache.size
 						}),
-						Effect.ignore,
-					);
-				}),
-		};
+						Effect.ignore
+					)
+				})
+		}
 	}),
-	dependencies: [BunContext.layer],
+	dependencies: [BunContext.layer]
 }) {}
 
 export const VaultCacheTest = (cache: Map<string, string>) =>
 	Layer.succeed(
 		VaultCache,
 		VaultCache.make({
-			getFile: (relativePath: string) =>
-				Effect.succeed(cache.get(relativePath)),
+			getFile: (relativePath: string) => Effect.succeed(cache.get(relativePath)),
 			getAllFiles: () => Effect.succeed(new Map(cache)),
 			searchInFiles: (query: string) => {
 				if (!query || query.trim() === "") {
-					return Effect.succeed([]);
+					return Effect.succeed([])
 				}
-				const results: Array<SearchResult> = [];
+				const results: Array<SearchResult> = []
 				for (const [filePath, content] of cache.entries()) {
-					const fileResults = searchInContent(content, query, filePath);
+					const fileResults = searchInContent(content, query, filePath)
 					for (const result of fileResults) {
-						results.push(result);
+						results.push(result)
 					}
 				}
-				return Effect.succeed(results);
+				return Effect.succeed(results)
 			},
-			reload: () => Effect.void,
-		}),
-	);
+			reload: () => Effect.void
+		})
+	)

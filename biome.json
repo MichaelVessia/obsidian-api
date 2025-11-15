@@ -7,13 +7,38 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": [
-			"**",
-			"!**/dist",
-			"!**/build",
-			"!**/docs",
-			"!**/*.md",
-			"!**/resources"
-		]
+		"includes": ["**", "!**/dist", "!**/build", "!**/docs", "!**/*.md", "!**/resources"]
+	},
+	"formatter": {
+		"indentWidth": 2,
+		"lineWidth": 120,
+		"lineEnding": "lf"
+	},
+	"javascript": {
+		"formatter": {
+			"quoteProperties": "asNeeded",
+			"trailingCommas": "none",
+			"semicolons": "asNeeded",
+			"arrowParentheses": "always",
+			"bracketSpacing": true,
+			"bracketSameLine": false,
+			"quoteStyle": "double"
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "off"
+			},
+			"style": {
+				"useImportType": "error",
+				"useExportType": "error"
+			},
+			"suspicious": {
+				"noExplicitAny": "off"
+			}
+		}
 	}
 }
