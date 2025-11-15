@@ -5,7 +5,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { VaultConfig } from "../config/vault.js"
 import { VaultCache } from "../vault-cache/service.js"
-import { SearchService } from "./service.js"
+import { SearchService, SearchServiceTest } from "./service.js"
 
 describe("SearchService", () => {
 	const createSearchTestVault = Effect.gen(function* () {
@@ -99,4 +99,35 @@ describe("SearchService", () => {
 				)
 			)
 		))
+
+	describe("with mocks", () => {
+		it("should return search results from mock", () =>
+			Effect.gen(function* () {
+				const service = yield* SearchService
+				const results = yield* service.simpleSearch("test")
+
+				expect(results).toHaveLength(1)
+				expect(results[0].filePath).toBe("test.md")
+			}).pipe(
+				Effect.provide(
+					SearchServiceTest(() =>
+						Effect.succeed([
+							{
+								filePath: "test.md",
+								lineNumber: 1,
+								context: "test content"
+							}
+						])
+					)
+				)
+			))
+
+		it("should handle empty results from mock", () =>
+			Effect.gen(function* () {
+				const service = yield* SearchService
+				const results = yield* service.simpleSearch("query")
+
+				expect(results).toHaveLength(0)
+			}).pipe(Effect.provide(SearchServiceTest(() => Effect.succeed([])))))
+	})
 })
