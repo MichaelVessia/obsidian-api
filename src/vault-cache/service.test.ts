@@ -88,7 +88,7 @@ describe("VaultCache", () => {
 	});
 
 	it("should include context around match", () => {
-		const longText = "a".repeat(150) + "query" + "b".repeat(150);
+		const longText = `${"a".repeat(150)}query${"b".repeat(150)}`;
 		const cache = new Map([["test.md", longText]]);
 
 		return Effect.gen(function* () {
