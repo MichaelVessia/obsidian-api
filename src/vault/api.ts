@@ -1,6 +1,16 @@
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
-import { SearchResults } from "./schema.js"
+
+export const SearchResult = Schema.Struct({
+	filePath: Schema.String,
+	lineNumber: Schema.Number,
+	context: Schema.String
+})
+
+export const SearchResults = Schema.Array(SearchResult)
+
+export type SearchResult = Schema.Schema.Type<typeof SearchResult>
+export type SearchResults = Schema.Schema.Type<typeof SearchResults>
 
 const filenameParam = HttpApiSchema.param("filename", Schema.String)
 const queryParam = HttpApiSchema.param("query", Schema.String)

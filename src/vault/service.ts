@@ -2,7 +2,7 @@ import { FileSystem, HttpApiError, Path } from "@effect/platform"
 import { BunContext } from "@effect/platform-bun"
 import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
-import type { SearchResult } from "./schema.js"
+import type { SearchResult } from "./api.js"
 
 export interface VaultMetrics {
 	totalFiles: number
