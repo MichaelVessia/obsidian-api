@@ -13,8 +13,6 @@ export interface VaultMetrics {
 	smallestFile: { path: string; bytes: number }
 }
 
-const DEBOUNCE_MS = 100
-
 const walkDirectory = (
 	fs: FileSystem.FileSystem,
 	path: Path.Path,
@@ -163,7 +161,7 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 			const timeout = setTimeout(() => {
 				pendingUpdates.delete(filePath)
 				Effect.runPromise(updateFile(filePath))
-			}, DEBOUNCE_MS)
+			}, config.debounceMs)
 
 			pendingUpdates.set(filePath, timeout)
 		}

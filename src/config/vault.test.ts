@@ -10,7 +10,8 @@ describe("VaultConfig", () => {
 		}).pipe(
 			Effect.provide(
 				Layer.succeed(VaultConfig, {
-					vaultPath: "/test-vault"
+					vaultPath: "/test-vault",
+					debounceMs: 100
 				})
 			)
 		))
@@ -23,7 +24,8 @@ describe("VaultConfig", () => {
 		}).pipe(
 			Effect.provide(
 				Layer.succeed(VaultConfig, {
-					vaultPath: `${process.env.HOME}/Documents/vault`
+					vaultPath: `${process.env.HOME}/Documents/vault`,
+					debounceMs: 100
 				})
 			)
 		))
