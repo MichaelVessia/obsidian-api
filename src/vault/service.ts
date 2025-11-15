@@ -4,6 +4,15 @@ import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import type { SearchResult } from "../search/schema.js"
 
+export interface VaultMetrics {
+	totalFiles: number
+	totalBytes: number
+	totalLines: number
+	averageFileSize: number
+	largestFile: { path: string; bytes: number }
+	smallestFile: { path: string; bytes: number }
+}
+
 const DEBOUNCE_MS = 100
 
 const walkDirectory = (
@@ -271,6 +280,40 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 						}),
 						Effect.ignore
 					)
+				}),
+
+			getMetrics: (): Effect.Effect<VaultMetrics> =>
+				Effect.gen(function* () {
+					const files = yield* Ref.get(cacheRef)
+
+					let totalBytes = 0
+					let totalLines = 0
+					let largest = { path: "", bytes: 0 }
+					let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
+
+					for (const [path, content] of files.entries()) {
+						const bytes = new TextEncoder().encode(content).length
+						const lines = content.split("\n").length
+
+						totalBytes += bytes
+						totalLines += lines
+
+						if (bytes > largest.bytes) {
+							largest = { path, bytes }
+						}
+						if (bytes < smallest.bytes) {
+							smallest = { path, bytes }
+						}
+					}
+
+					return {
+						totalFiles: files.size,
+						totalBytes,
+						totalLines,
+						averageFileSize: files.size > 0 ? Math.round(totalBytes / files.size) : 0,
+						largestFile: largest.path ? largest : { path: "none", bytes: 0 },
+						smallestFile: smallest.path ? smallest : { path: "none", bytes: 0 }
+					}
 				})
 		}
 	}),
@@ -307,6 +350,36 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
 				}
 				return Effect.succeed(results)
 			},
-			reload: () => Effect.void
+			reload: () => Effect.void,
+			getMetrics: (): Effect.Effect<VaultMetrics> => {
+				let totalBytes = 0
+				let totalLines = 0
+				let largest = { path: "", bytes: 0 }
+				let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
+
+				for (const [path, content] of cache.entries()) {
+					const bytes = new TextEncoder().encode(content).length
+					const lines = content.split("\n").length
+
+					totalBytes += bytes
+					totalLines += lines
+
+					if (bytes > largest.bytes) {
+						largest = { path, bytes }
+					}
+					if (bytes < smallest.bytes) {
+						smallest = { path, bytes }
+					}
+				}
+
+				return Effect.succeed({
+					totalFiles: cache.size,
+					totalBytes,
+					totalLines,
+					averageFileSize: cache.size > 0 ? Math.round(totalBytes / cache.size) : 0,
+					largestFile: largest.path ? largest : { path: "none", bytes: 0 },
+					smallestFile: smallest.path ? smallest : { path: "none", bytes: 0 }
+				})
+			}
 		})
 	)
