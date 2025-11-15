@@ -1,7 +1,9 @@
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
+import { SearchResults } from "./schema.js"
 
 const filenameParam = HttpApiSchema.param("filename", Schema.String)
+const queryParam = HttpApiSchema.param("query", Schema.String)
 
 export const vaultGroup = HttpApiGroup.make("Vault")
 	.add(
@@ -48,3 +50,4 @@ export const vaultGroup = HttpApiGroup.make("Vault")
 			})
 		)
 	)
+	.add(HttpApiEndpoint.get("search")`/vault/search/simple/${queryParam}`.addSuccess(SearchResults))
