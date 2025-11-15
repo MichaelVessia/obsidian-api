@@ -4,7 +4,7 @@ import { Effect, Layer } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import { withTestVault } from "../test-helpers.js"
 import { VaultCache } from "../vault-cache/service.js"
-import { VaultFilesService } from "./service.js"
+import { VaultFilesService, VaultFilesServiceTest } from "./service.js"
 
 describe("VaultFilesService", () => {
 	it("should read file content successfully", () =>
@@ -75,4 +75,23 @@ describe("VaultFilesService", () => {
 				)
 			)
 		))
+
+	describe("with mocks", () => {
+		it("should return file content from mock", () =>
+			Effect.gen(function* () {
+				const service = yield* VaultFilesService
+				const content = yield* service.getFile("test.md")
+
+				expect(content).toBe("# Test Content")
+			}).pipe(Effect.provide(VaultFilesServiceTest(() => Effect.succeed("# Test Content")))))
+
+		it("should handle not found error from mock", () =>
+			Effect.gen(function* () {
+				const service = yield* VaultFilesService
+				const result = yield* Effect.flip(service.getFile("missing.md"))
+
+				expect(result).toBeInstanceOf(HttpApiError.NotFound)
+				expect(result._tag).toBe("NotFound")
+			}).pipe(Effect.provide(VaultFilesServiceTest(() => Effect.fail(new HttpApiError.NotFound())))))
+	})
 })
