@@ -3,7 +3,7 @@
 	"include": ["test", "src/**/*.test.ts"],
 	"references": [{ "path": "tsconfig.src.json" }],
 	"compilerOptions": {
-		"types": ["node"],
+		"types": ["bun"],
 		"tsBuildInfoFile": ".tsbuildinfo/test.tsbuildinfo",
 		"noEmit": true
 	}

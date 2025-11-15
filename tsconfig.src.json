@@ -3,7 +3,7 @@
 	"include": ["src"],
 	"exclude": ["src/**/*.test.ts"],
 	"compilerOptions": {
-		"types": ["node", "bun"],
+		"types": ["bun"],
 		"outDir": "build/src",
 		"tsBuildInfoFile": ".tsbuildinfo/src.tsbuildinfo",
 		"rootDir": "src"
