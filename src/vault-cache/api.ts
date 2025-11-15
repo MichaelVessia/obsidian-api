@@ -1,7 +1,7 @@
 import { HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
 import { Schema } from "effect"
 
-export const cacheGroup = HttpApiGroup.make("Cache")
+export const vaultCacheGroup = HttpApiGroup.make("Vault Cache")
 	.add(
 		HttpApiEndpoint.get("listFiles", "/cache/files").addSuccess(
 			Schema.Record({ key: Schema.String, value: Schema.String })

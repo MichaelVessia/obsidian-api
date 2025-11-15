@@ -1,7 +1,7 @@
 import { HttpApi, HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from "@effect/platform"
 import { BunHttpServer } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
-import { cacheGroup } from "../cache/api.js"
+import { vaultCacheGroup } from "../vault-cache/api.js"
 import { VaultConfigLive } from "../config/vault.js"
 import { searchGroup } from "../search/api.js"
 import { SearchService } from "../search/service.js"
@@ -10,7 +10,7 @@ import { vaultFilesGroup } from "../vault-files/api.js"
 import { VaultFilesService } from "../vault-files/service.js"
 import { VaultStatsService } from "../vault-stats/service.js"
 
-export const api = HttpApi.make("Obsidian API").add(searchGroup).add(vaultFilesGroup).add(cacheGroup)
+export const api = HttpApi.make("Obsidian API").add(searchGroup).add(vaultFilesGroup).add(vaultCacheGroup)
 
 const searchHandlers = HttpApiBuilder.group(api, "Search", (handlers) =>
 	handlers.handle("simple", ({ path: { query } }) =>
@@ -24,7 +24,7 @@ const vaultFilesHandlers = HttpApiBuilder.group(api, "Vault Files", (handlers) =
 	)
 )
 
-const cacheHandlers = HttpApiBuilder.group(api, "Cache", (handlers) =>
+const vaultCacheHandlers = HttpApiBuilder.group(api, "Vault Cache", (handlers) =>
 	handlers
 		.handle("listFiles", () =>
 			Effect.gen(function* () {
@@ -50,7 +50,7 @@ const cacheHandlers = HttpApiBuilder.group(api, "Cache", (handlers) =>
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
 	Layer.provide(searchHandlers),
 	Layer.provide(vaultFilesHandlers),
-	Layer.provide(cacheHandlers),
+	Layer.provide(vaultCacheHandlers),
 	Layer.provide(SearchService.Default),
 	Layer.provide(VaultFilesService.Default),
 	Layer.provide(VaultStatsService.Default),
