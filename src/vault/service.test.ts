@@ -835,4 +835,99 @@ describe('VaultService', () => {
       expect(results[0]?.context).toContain('target')
     })
   })
+
+  describe('getFilePaths pagination', () => {
+    it('should return paginated file paths with correct total', () => {
+      const cache = new Map([
+        ['file1.md', 'content1'],
+        ['file2.md', 'content2'],
+        ['file3.md', 'content3'],
+        ['file4.md', 'content4'],
+        ['file5.md', 'content5'],
+      ])
+
+      return Effect.gen(function* () {
+        const service = yield* VaultService
+        const result = yield* service.getFilePaths(2, 1)
+
+        expect(result.total).toBe(5)
+        expect(result.files).toEqual(['file2.md', 'file3.md'])
+      }).pipe(Effect.provide(VaultServiceTest(cache)))
+    })
+
+    it('should handle offset 0 and return first page', () => {
+      const cache = new Map([
+        ['a.md', 'content1'],
+        ['b.md', 'content2'],
+        ['c.md', 'content3'],
+      ])
+
+      return Effect.gen(function* () {
+        const service = yield* VaultService
+        const result = yield* service.getFilePaths(2, 0)
+
+        expect(result.total).toBe(3)
+        expect(result.files).toEqual(['a.md', 'b.md'])
+      }).pipe(Effect.provide(VaultServiceTest(cache)))
+    })
+
+    it('should handle limit larger than remaining items', () => {
+      const cache = new Map([
+        ['file1.md', 'content1'],
+        ['file2.md', 'content2'],
+      ])
+
+      return Effect.gen(function* () {
+        const service = yield* VaultService
+        const result = yield* service.getFilePaths(10, 1)
+
+        expect(result.total).toBe(2)
+        expect(result.files).toEqual(['file2.md'])
+      }).pipe(Effect.provide(VaultServiceTest(cache)))
+    })
+
+    it('should handle offset beyond available items', () => {
+      const cache = new Map([
+        ['file1.md', 'content1'],
+        ['file2.md', 'content2'],
+      ])
+
+      return Effect.gen(function* () {
+        const service = yield* VaultService
+        const result = yield* service.getFilePaths(10, 10)
+
+        expect(result.total).toBe(2)
+        expect(result.files).toEqual([])
+      }).pipe(Effect.provide(VaultServiceTest(cache)))
+    })
+
+    it('should return no files when limit is 0', () => {
+      const cache = new Map([
+        ['file1.md', 'content1'],
+        ['file2.md', 'content2'],
+        ['file3.md', 'content3'],
+      ])
+
+      return Effect.gen(function* () {
+        const service = yield* VaultService
+        const result = yield* service.getFilePaths(0, 0)
+
+        expect(result.total).toBe(3)
+        expect(result.files).toHaveLength(0)
+        expect(result.files).toEqual([])
+      }).pipe(Effect.provide(VaultServiceTest(cache)))
+    })
+
+    it('should handle empty cache', () => {
+      const cache = new Map()
+
+      return Effect.gen(function* () {
+        const service = yield* VaultService
+        const result = yield* service.getFilePaths(10, 0)
+
+        expect(result.total).toBe(0)
+        expect(result.files).toEqual([])
+      }).pipe(Effect.provide(VaultServiceTest(cache)))
+    })
+  })
 })

@@ -15,10 +15,15 @@ const getFileHandler = Effect.fn('vault.getFile', { attributes: { filename: (fil
   },
 )
 
-const listFilesHandler = Effect.fn('vault.listFiles')(function* () {
+const listFilesHandler = Effect.fn('vault.listFiles')(function* (limit: number, offset: number) {
   const vault = yield* VaultService
-  const files = yield* vault.getAllFiles()
-  return Object.fromEntries(files)
+  const result = yield* vault.getFilePaths(limit, offset)
+  return {
+    files: result.files,
+    total: result.total,
+    offset,
+    limit,
+  }
 })
 
 const reloadHandler = Effect.fn('vault.reload')(function* () {
@@ -46,7 +51,7 @@ const searchHandler = Effect.fn('vault.search', { attributes: { query: (query: s
 const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
   handlers
     .handle('getFile', ({ path: { filename } }) => getFileHandler(filename))
-    .handle('listFiles', () => listFilesHandler())
+    .handle('listFiles', () => listFilesHandler(50, 0))
     .handle('reload', () => reloadHandler())
     .handle('metrics', () => metricsHandler())
     .handle('search', ({ path: { query } }) => searchHandler(query)),

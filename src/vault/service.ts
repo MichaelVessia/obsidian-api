@@ -49,7 +49,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }).pipe(Effect.catchAll(() => Effect.succeed([])))
 
       const files = yield* walkDirectory(config.vaultPath).pipe(
-        Effect.withSpan('vault.walkDirectory', { attributes: { dirPath: config.vaultPath } }),
+        Effect.withSpan('vault.walkDirectory', {
+          attributes: { dirPath: config.vaultPath },
+        }),
       )
 
       const fileContents = yield* Effect.forEach(
@@ -220,28 +222,28 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }),
 
       // HTTP-friendly getFile with error handling and filename normalization
-      getFileContent: Effect.fn('vault.getFileContent', { attributes: { filename: (filename: string) => filename } })(
-        function* (filename: string) {
-          // Early return with BadRequest error for invalid input
-          if (!filename || filename.trim() === '') {
-            return yield* Effect.fail(new HttpApiError.BadRequest())
-          }
+      getFileContent: Effect.fn('vault.getFileContent', {
+        attributes: { filename: (filename: string) => filename },
+      })(function* (filename: string) {
+        // Early return with BadRequest error for invalid input
+        if (!filename || filename.trim() === '') {
+          return yield* Effect.fail(new HttpApiError.BadRequest())
+        }
 
-          // Normalize filename to always end with .md
-          const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
+        // Normalize filename to always end with .md
+        const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
 
-          // Get content from cache
-          const cache = yield* Ref.get(cacheRef)
-          const vaultFile = cache.get(normalizedFilename)
+        // Get content from cache
+        const cache = yield* Ref.get(cacheRef)
+        const vaultFile = cache.get(normalizedFilename)
 
-          // Convert undefined to NotFound error for API consistency
-          if (vaultFile === undefined) {
-            return yield* Effect.fail(new HttpApiError.NotFound())
-          }
+        // Convert undefined to NotFound error for API consistency
+        if (vaultFile === undefined) {
+          return yield* Effect.fail(new HttpApiError.NotFound())
+        }
 
-          return vaultFile.content
-        },
-      ),
+        return vaultFile.content
+      }),
 
       getAllFiles: Effect.fn('vault.getAllFiles')(function* () {
         const cache = yield* Ref.get(cacheRef)
@@ -252,9 +254,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         return stringMap
       }),
 
-      searchInFiles: Effect.fn('vault.searchInFiles', { attributes: { query: (query: string) => query } })(function* (
-        query: string,
-      ) {
+      searchInFiles: Effect.fn('vault.searchInFiles', {
+        attributes: { query: (query: string) => query },
+      })(function* (query: string) {
         if (!query || query.trim() === '') {
           return []
         }
@@ -315,6 +317,20 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
           }
         }),
+
+      getFilePaths: Effect.fn('vault.getFilePaths')(function* (limit: number, offset: number) {
+        const cache = yield* Ref.get(cacheRef)
+        const allPaths = Array.from(cache.keys())
+        const total = allPaths.length
+
+        const files = yield* Stream.fromIterable(allPaths).pipe(
+          Stream.drop(offset),
+          Stream.take(limit),
+          Stream.runCollect,
+        )
+
+        return { files: Array.from(files), total }
+      }),
     }
   }),
   dependencies: [BunContext.layer],
@@ -390,5 +406,18 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
           smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
         })
       },
+      getFilePaths: (limit: number, offset: number) =>
+        Effect.gen(function* () {
+          const allPaths = Array.from(cache.keys())
+          const total = allPaths.length
+
+          const files = yield* Stream.fromIterable(allPaths).pipe(
+            Stream.drop(offset),
+            Stream.take(limit),
+            Stream.runCollect,
+          )
+
+          return { files: Array.from(files), total }
+        }),
     }),
   )
