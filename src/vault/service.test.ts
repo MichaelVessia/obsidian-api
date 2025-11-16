@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
 import { Effect } from "effect"
-import type { Path } from "@effect/platform"
 import {
 	VaultService,
 	VaultServiceTest,
@@ -21,7 +20,7 @@ const mockPath = {
 	extname: (path: string) => (path.includes(".") ? `.${path.split(".").pop()}` : ""),
 	resolve: (...paths: string[]) => paths.join("/"),
 	normalize: (path: string) => path
-} as Path.Path
+} as any
 
 describe("VaultService", () => {
 	it("should return file content for existing file", () => {
@@ -803,8 +802,10 @@ describe("loadAllFiles", () => {
 			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
 
 			expect(result.size).toBe(2)
-			expect(result.get("file1.md")?.content).toBe("Content 1")
-			expect(result.get("subdir/file2.md")?.content).toBe("Content 2")
+			const file1 = result.get("file1.md")
+			const file2 = result.get("subdir/file2.md")
+			expect(file1?.content).toBe("Content 1")
+			expect(file2?.content).toBe("Content 2")
 		}))
 
 	it("should handle empty directory", () =>
@@ -837,5 +838,161 @@ describe("loadAllFiles", () => {
 			// file1 should have default empty content due to error
 			expect(result.get("file1.md")?.content).toBe("")
 			expect(result.get("file2.md")?.content).toBe("Content 2")
+		}))
+})
+
+// Additional comprehensive unit tests for internal functions
+describe("walkDirectory comprehensive tests", () => {
+	it("should handle mixed file types and filter correctly", () =>
+		Effect.gen(function* () {
+			const mockFs = {
+				readDirectory: () => Effect.succeed(["file.md", "file.txt", "image.png", "document.MD"]),
+				stat: (path: string) => Effect.succeed({ type: "File" })
+			} as any
+
+			const result = yield* walkDirectory(mockFs, mockPath, "/test")
+
+			// Should only include .md files (case insensitive)
+			expect(result).toHaveLength(2)
+			expect(result).toContain("/test/file.md")
+			expect(result).toContain("/test/document.MD")
+		}))
+
+	it("should handle custom ignore patterns", () =>
+		Effect.gen(function* () {
+			const mockFs = {
+				readDirectory: () => Effect.succeed(["file.md", ".git", "node_modules", "temp.md"]),
+				stat: (path: string) => {
+					if (path.includes("node_modules")) return Effect.succeed({ type: "Directory" })
+					return Effect.succeed({ type: "File" })
+				}
+			} as any
+
+			const result = yield* walkDirectory(mockFs, mockPath, "/test", [".git", "node_modules"])
+
+			// Should exclude ignored patterns
+			expect(result).toHaveLength(2)
+			expect(result).toContain("/test/file.md")
+			expect(result).toContain("/test/temp.md")
+			expect(result).not.toContain("/test/.git")
+		}))
+
+	it("should handle deeply nested directory structures", () =>
+		Effect.gen(function* () {
+			const mockFs = {
+				readDirectory: (path: string) => {
+					if (path === "/test") return Effect.succeed(["a", "file.md"])
+					if (path === "/test/a") return Effect.succeed(["b"])
+					if (path === "/test/a/b") return Effect.succeed(["c"])
+					if (path === "/test/a/b/c") return Effect.succeed(["deep.md"])
+					return Effect.succeed([])
+				},
+				stat: (path: string) => {
+					if (path.endsWith(".md")) return Effect.succeed({ type: "File" })
+					return Effect.succeed({ type: "Directory" })
+				}
+			} as any
+
+			const result = yield* walkDirectory(mockFs, mockPath, "/test")
+
+			expect(result).toHaveLength(2)
+			expect(result).toContain("/test/file.md")
+			expect(result).toContain("/test/a/b/c/deep.md")
+		}))
+})
+
+describe("loadFileContent comprehensive tests", () => {
+	it("should handle files with only frontmatter", () =>
+		Effect.gen(function* () {
+			const contentWithOnlyFrontmatter = "---\ntitle: Test\nauthor: John\n---"
+			const mockFs = {
+				readFileString: () => Effect.succeed(contentWithOnlyFrontmatter),
+				stat: () => Effect.succeed({ type: "File" })
+			} as any
+
+			const result = yield* loadFileContent(mockFs, "/test/frontmatter-only.md")
+
+			expect(result.path).toBe("/test/frontmatter-only.md")
+			expect(result.content).toBe("")
+			expect(result.frontmatter).toEqual({ title: "Test", author: "John" })
+			expect(result.bytes).toBe(0)
+			expect(result.lines).toBe(1) // Empty string still counts as 1 line
+		}))
+
+	it("should handle files with malformed frontmatter", () =>
+		Effect.gen(function* () {
+			const malformedFrontmatter = "---\ntitle: Test\nauthor: John\ncontent without closing"
+			const mockFs = {
+				readFileString: () => Effect.succeed(malformedFrontmatter),
+				stat: () => Effect.succeed({ type: "File" })
+			} as any
+
+			const result = yield* loadFileContent(mockFs, "/test/malformed.md")
+
+			// Should treat entire content as main content when frontmatter parsing fails
+			expect(result.content).toBe(malformedFrontmatter)
+			expect(result.frontmatter).toEqual({})
+			expect(result.bytes).toBe(new TextEncoder().encode(malformedFrontmatter).length)
+		}))
+
+	it("should handle files with complex frontmatter data types", () =>
+		Effect.gen(function* () {
+			const complexFrontmatter = `---
+title: "Complex Title"
+tags: [tag1, tag2, tag3]
+published: true
+count: 42
+metadata:
+  nested: value
+---
+# Main Content
+Some content here`
+			const mockFs = {
+				readFileString: () => Effect.succeed(complexFrontmatter),
+				stat: () => Effect.succeed({ type: "File" })
+			} as any
+
+			const result = yield* loadFileContent(mockFs, "/test/complex.md")
+
+			expect(result.content).toBe("# Main Content\nSome content here")
+			expect(result.frontmatter).toEqual({
+				title: "Complex Title",
+				tags: ["tag1", "tag2", "tag3"],
+				published: true,
+				count: 42
+			})
+		}))
+})
+
+describe("loadAllFiles comprehensive tests", () => {
+	it("should handle mixed directory and file structure", () =>
+		Effect.gen(function* () {
+			const mockFs = {
+				readDirectory: (path: string) => {
+					if (path === "/vault") return Effect.succeed(["root.md", "subdir", "empty.md"])
+					if (path === "/vault/subdir") return Effect.succeed(["nested.md"])
+					return Effect.succeed([])
+				},
+				stat: (path: string) => {
+					if (path.includes("subdir")) return Effect.succeed({ type: "Directory" })
+					return Effect.succeed({ type: "File" })
+				},
+				readFileString: (path: string) => {
+					if (path.includes("root")) return Effect.succeed("Root content")
+					if (path.includes("nested")) return Effect.succeed("Nested content")
+					if (path.includes("empty")) return Effect.succeed("")
+					return Effect.succeed("")
+				}
+			} as any
+
+			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
+
+			expect(result.size).toBe(3)
+			const rootFile = result.get("root.md")
+			const nestedFile = result.get("subdir/nested.md")
+			const emptyFile = result.get("empty.md")
+			expect(rootFile?.content).toBe("Root content")
+			expect(nestedFile?.content).toBe("Nested content")
+			expect(emptyFile?.content).toBe("")
 		}))
 })
