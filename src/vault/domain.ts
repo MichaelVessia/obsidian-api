@@ -60,6 +60,10 @@ export const parseFrontmatter = (
 
   const [, frontmatterStr, mainContent] = match
 
+  if (!frontmatterStr) {
+    return Effect.succeed({ frontmatter: {}, content: mainContent ?? '' })
+  }
+
   const lines = frontmatterStr.split('\n')
   const frontmatterEntries: Array<[string, string | number | boolean | readonly string[]]> = []
 
@@ -83,6 +87,6 @@ export const parseFrontmatter = (
 
   return Effect.map(parseResult, (frontmatter) => ({
     frontmatter,
-    content: mainContent,
+    content: mainContent ?? '',
   }))
 }

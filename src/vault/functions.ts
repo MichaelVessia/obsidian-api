@@ -8,6 +8,8 @@ export const searchInContent = (vaultFile: VaultFile, query: string): Array<Sear
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    if (!line) continue
+
     const lowerLine = line.toLowerCase()
 
     if (lowerLine.includes(lowerQuery)) {

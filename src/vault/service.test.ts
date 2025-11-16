@@ -58,11 +58,11 @@ describe('VaultService', () => {
       const results = yield* service.searchInFiles('query')
 
       expect(results).toHaveLength(2)
-      expect(results[0].filePath).toBe('file1.md')
-      expect(results[0].lineNumber).toBe(2)
-      expect(results[0].context).toContain('query')
-      expect(results[1].filePath).toBe('file2.md')
-      expect(results[1].lineNumber).toBe(2)
+      expect(results[0]?.filePath).toBe('file1.md')
+      expect(results[0]?.lineNumber).toBe(2)
+      expect(results[0]?.context).toContain('query')
+      expect(results[1]?.filePath).toBe('file2.md')
+      expect(results[1]?.lineNumber).toBe(2)
     }).pipe(Effect.provide(VaultServiceTest(cache)))
   })
 
@@ -85,7 +85,7 @@ describe('VaultService', () => {
       const results = yield* service.searchInFiles('query')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context).toContain('QUERY')
+      expect(results[0]?.context).toContain('QUERY')
     }).pipe(Effect.provide(VaultServiceTest(cache)))
   })
 
@@ -98,8 +98,8 @@ describe('VaultService', () => {
       const results = yield* service.searchInFiles('query')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context.length).toBeLessThanOrEqual(205) // 100 before + 5 (query) + 100 after
-      expect(results[0].context).toContain('query')
+      expect(results[0]?.context.length).toBeLessThanOrEqual(205) // 100 before + 5 (query) + 100 after
+      expect(results[0]?.context).toContain('query')
     }).pipe(Effect.provide(VaultServiceTest(cache)))
   })
 
@@ -249,7 +249,7 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('!@#$%^&*()')
 
         expect(results).toHaveLength(1)
-        expect(results[0].context).toContain('!@#$%^&*()')
+        expect(results[0]?.context).toContain('!@#$%^&*()')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -261,8 +261,8 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('search')
 
         expect(results).toHaveLength(2)
-        expect(results[0].lineNumber).toBe(1)
-        expect(results[1].lineNumber).toBe(3)
+        expect(results[0]?.lineNumber).toBe(1)
+        expect(results[1]?.lineNumber).toBe(3)
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -274,8 +274,8 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('search')
 
         expect(results).toHaveLength(1)
-        expect(results[0].lineNumber).toBe(1)
-        expect(results[0].context).toContain('search term at start')
+        expect(results[0]?.lineNumber).toBe(1)
+        expect(results[0]?.context).toContain('search term at start')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -287,8 +287,8 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('search')
 
         expect(results).toHaveLength(1)
-        expect(results[0].lineNumber).toBe(1)
-        expect(results[0].context).toContain('term at end search')
+        expect(results[0]?.lineNumber).toBe(1)
+        expect(results[0]?.context).toContain('term at end search')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
   })
@@ -386,9 +386,9 @@ describe('VaultService', () => {
 
         // This tests the internal searchInContent function indirectly
         expect(results).toHaveLength(1)
-        expect(results[0].filePath).toBe('test.md')
-        expect(results[0].lineNumber).toBe(2)
-        expect(results[0].context).toContain('Search term here')
+        expect(results[0]?.filePath).toBe('test.md')
+        expect(results[0]?.lineNumber).toBe(2)
+        expect(results[0]?.context).toContain('Search term here')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -455,8 +455,8 @@ describe('VaultService', () => {
 
         // Tests the test layer's searchInFiles implementation
         expect(results).toHaveLength(1)
-        expect(results[0].filePath).toBe('test.md')
-        expect(results[0].context).toContain('search term')
+        expect(results[0]?.filePath).toBe('test.md')
+        expect(results[0]?.context).toContain('search term')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -489,7 +489,7 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('[brackets]')
 
         expect(results).toHaveLength(1)
-        expect(results[0].context).toContain('[brackets]')
+        expect(results[0]?.context).toContain('[brackets]')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -501,8 +501,8 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('search')
 
         expect(results).toHaveLength(2)
-        expect(results[0].lineNumber).toBe(2)
-        expect(results[1].lineNumber).toBe(4)
+        expect(results[0]?.lineNumber).toBe(2)
+        expect(results[1]?.lineNumber).toBe(4)
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -558,7 +558,7 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('test')
 
         expect(results).toHaveLength(1) // Should find line once, not multiple times for overlapping matches
-        expect(results[0].context).toContain('testtest test')
+        expect(results[0]?.context).toContain('testtest test')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -611,7 +611,7 @@ describe('VaultService', () => {
         const results = yield* service.searchInFiles('search')
 
         expect(results).toHaveLength(1)
-        expect(results[0].filePath).toBe('file50.md')
+        expect(results[0]?.filePath).toBe('file50.md')
       }).pipe(Effect.provide(VaultServiceTest(largeCache)))
     })
   })
@@ -659,7 +659,7 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'test')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context).toContain('Test TEST test TeSt')
+      expect(results[0]?.context).toContain('Test TEST test TeSt')
     })
 
     it('should handle context extraction at line boundaries', () => {
@@ -674,7 +674,7 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'searchterm')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context).toContain('verylonglinewithsearchtermattheend')
+      expect(results[0]?.context).toContain('verylonglinewithsearchtermattheend')
     })
 
     it('should be case-insensitive', () => {
@@ -689,7 +689,7 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'search')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context).toContain('SEARCH TERM HERE')
+      expect(results[0]?.context).toContain('SEARCH TERM HERE')
     })
 
     it('should handle multiple matches in same file', () => {
@@ -704,8 +704,8 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'search')
 
       expect(results).toHaveLength(2)
-      expect(results[0].lineNumber).toBe(1)
-      expect(results[1].lineNumber).toBe(3)
+      expect(results[0]?.lineNumber).toBe(1)
+      expect(results[1]?.lineNumber).toBe(3)
     })
 
     it('should limit context to 100 characters around match', () => {
@@ -721,8 +721,8 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'query')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context.length).toBeLessThanOrEqual(206) // 100 before + 5 (query) + 100 after + 1 for index difference
-      expect(results[0].context).toContain('query')
+      expect(results[0]?.context.length).toBeLessThanOrEqual(206) // 100 before + 5 (query) + 100 after + 1 for index difference
+      expect(results[0]?.context).toContain('query')
     })
 
     it('should handle empty content', () => {
@@ -751,7 +751,7 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, '!@#$%^&*()')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context).toContain('!@#$%^&*()')
+      expect(results[0]?.context).toContain('!@#$%^&*()')
     })
 
     it('should handle query at beginning and end of line', () => {
@@ -766,10 +766,10 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'search')
 
       expect(results).toHaveLength(2)
-      expect(results[0].lineNumber).toBe(1)
-      expect(results[0].context).toContain('search at start')
-      expect(results[1].lineNumber).toBe(2)
-      expect(results[1].context).toContain('end with search')
+      expect(results[0]?.lineNumber).toBe(1)
+      expect(results[0]?.context).toContain('search at start')
+      expect(results[1]?.lineNumber).toBe(2)
+      expect(results[1]?.context).toContain('end with search')
     })
 
     it('should handle unicode characters correctly', () => {
@@ -784,8 +784,8 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, '世界')
 
       expect(results).toHaveLength(2)
-      expect(results[0].lineNumber).toBe(1)
-      expect(results[1].lineNumber).toBe(2)
+      expect(results[0]?.lineNumber).toBe(1)
+      expect(results[1]?.lineNumber).toBe(2)
     })
 
     it('should handle empty query', () => {
@@ -831,8 +831,8 @@ describe('VaultService', () => {
       const results = searchInContent(vaultFile, 'target')
 
       expect(results).toHaveLength(1)
-      expect(results[0].context.length).toBeLessThanOrEqual(206) // Should still limit context
-      expect(results[0].context).toContain('target')
+      expect(results[0]?.context.length).toBeLessThanOrEqual(206) // Should still limit context
+      expect(results[0]?.context).toContain('target')
     })
   })
 })
