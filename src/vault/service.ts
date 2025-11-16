@@ -3,16 +3,7 @@ import { BunContext } from "@effect/platform-bun"
 import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import type { SearchResult } from "./api.js"
-import { parseFrontmatter, type VaultFile } from "./domain.js"
-
-export interface VaultMetrics {
-	totalFiles: number
-	totalBytes: number
-	totalLines: number
-	averageFileSize: number
-	largestFile: { path: string; bytes: number }
-	smallestFile: { path: string; bytes: number }
-}
+import { parseFrontmatter, type VaultFile, type VaultMetrics } from "./domain.js"
 
 const walkDirectory = (
 	fs: FileSystem.FileSystem,
