@@ -220,8 +220,8 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }),
 
       // HTTP-friendly getFile with error handling and filename normalization
-      getFileContent: (filename: string) =>
-        Effect.gen(function* () {
+      getFileContent: Effect.fn('vault.getFileContent', { attributes: { filename: (filename: string) => filename } })(
+        function* (filename: string) {
           // Early return with BadRequest error for invalid input
           if (!filename || filename.trim() === '') {
             return yield* Effect.fail(new HttpApiError.BadRequest())
@@ -240,50 +240,50 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           }
 
           return vaultFile.content
-        }).pipe(Effect.withSpan('vault.getFileContent', { attributes: { filename } })),
+        },
+      ),
 
-      getAllFiles: () =>
-        Effect.gen(function* () {
-          const cache = yield* Ref.get(cacheRef)
-          const stringMap = new Map<string, string>()
-          for (const [path, vaultFile] of cache.entries()) {
-            stringMap.set(path, vaultFile.content)
+      getAllFiles: Effect.fn('vault.getAllFiles')(function* () {
+        const cache = yield* Ref.get(cacheRef)
+        const stringMap = new Map<string, string>()
+        for (const [path, vaultFile] of cache.entries()) {
+          stringMap.set(path, vaultFile.content)
+        }
+        return stringMap
+      }),
+
+      searchInFiles: Effect.fn('vault.searchInFiles', { attributes: { query: (query: string) => query } })(function* (
+        query: string,
+      ) {
+        if (!query || query.trim() === '') {
+          return []
+        }
+
+        const cache = yield* Ref.get(cacheRef)
+        const results: Array<SearchResult> = []
+
+        // Optimized sequential search with pre-lowercased query
+        for (const [, vaultFile] of cache.entries()) {
+          const fileResults = searchInContent(vaultFile, query)
+          for (const result of fileResults) {
+            results.push(result)
           }
-          return stringMap
-        }).pipe(Effect.withSpan('vault.getAllFiles')),
+        }
 
-      searchInFiles: (query: string) =>
-        Effect.gen(function* () {
-          if (!query || query.trim() === '') {
-            return []
-          }
+        return results
+      }),
 
-          const cache = yield* Ref.get(cacheRef)
-          const results: Array<SearchResult> = []
-
-          // Optimized sequential search with pre-lowercased query
-          for (const [, vaultFile] of cache.entries()) {
-            const fileResults = searchInContent(vaultFile, query)
-            for (const result of fileResults) {
-              results.push(result)
-            }
-          }
-
-          return results
-        }).pipe(Effect.withSpan('vault.searchInFiles', { attributes: { query } })),
-
-      reload: () =>
-        Effect.gen(function* () {
-          const newCache = yield* loadAllFiles
-          yield* Ref.set(cacheRef, newCache)
-          yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
-            Effect.annotateLogs({
-              vaultPath: config.vaultPath,
-              fileCount: newCache.size,
-            }),
-            Effect.ignore,
-          )
-        }).pipe(Effect.withSpan('vault.reload')),
+      reload: Effect.fn('vault.reload')(function* () {
+        const newCache = yield* loadAllFiles
+        yield* Ref.set(cacheRef, newCache)
+        yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
+          Effect.annotateLogs({
+            vaultPath: config.vaultPath,
+            fileCount: newCache.size,
+          }),
+          Effect.ignore,
+        )
+      }),
 
       getMetrics: (): Effect.Effect<VaultMetrics> =>
         Effect.gen(function* () {

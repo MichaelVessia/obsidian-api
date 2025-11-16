@@ -8,39 +8,48 @@ import { TracerLayer } from '../tracing/index.js'
 
 export const api = HttpApi.make('Obsidian API').add(vaultGroup)
 
+const getFileHandler = Effect.fn('vault.getFile', { attributes: { filename: (filename: string) => filename } })(
+  function* (filename: string) {
+    const service = yield* VaultService
+    return yield* service.getFileContent(filename)
+  },
+)
+
+const listFilesHandler = Effect.fn('vault.listFiles')(function* () {
+  const vault = yield* VaultService
+  const files = yield* vault.getAllFiles()
+  return Object.fromEntries(files)
+})
+
+const reloadHandler = Effect.fn('vault.reload')(function* () {
+  const vault = yield* VaultService
+  yield* vault.reload()
+  const files = yield* vault.getAllFiles()
+  return {
+    message: 'Vault reloaded successfully',
+    filesLoaded: files.size,
+  }
+})
+
+const metricsHandler = Effect.fn('vault.metrics')(function* () {
+  const service = yield* VaultService
+  return yield* service.getMetrics()
+})
+
+const searchHandler = Effect.fn('vault.search', { attributes: { query: (query: string) => query } })(function* (
+  query: string,
+) {
+  const service = yield* VaultService
+  return yield* service.searchInFiles(query)
+})
+
 const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
   handlers
-    .handle('getFile', ({ path: { filename } }) =>
-      Effect.flatMap(VaultService, (service) => service.getFileContent(filename)).pipe(
-        Effect.withSpan('vault.getFile', { attributes: { filename } }),
-      ),
-    )
-    .handle('listFiles', () =>
-      Effect.gen(function* () {
-        const vault = yield* VaultService
-        const files = yield* vault.getAllFiles()
-        return Object.fromEntries(files)
-      }).pipe(Effect.withSpan('vault.listFiles')),
-    )
-    .handle('reload', () =>
-      Effect.gen(function* () {
-        const vault = yield* VaultService
-        yield* vault.reload()
-        const files = yield* vault.getAllFiles()
-        return {
-          message: 'Vault reloaded successfully',
-          filesLoaded: files.size,
-        }
-      }).pipe(Effect.withSpan('vault.reload')),
-    )
-    .handle('metrics', () =>
-      Effect.flatMap(VaultService, (service) => service.getMetrics()).pipe(Effect.withSpan('vault.metrics')),
-    )
-    .handle('search', ({ path: { query } }) =>
-      Effect.flatMap(VaultService, (service) => service.searchInFiles(query)).pipe(
-        Effect.withSpan('vault.search', { attributes: { query } }),
-      ),
-    ),
+    .handle('getFile', ({ path: { filename } }) => getFileHandler(filename))
+    .handle('listFiles', () => listFilesHandler())
+    .handle('reload', () => reloadHandler())
+    .handle('metrics', () => metricsHandler())
+    .handle('search', ({ path: { query } }) => searchHandler(query)),
 )
 
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
