@@ -1,73 +1,73 @@
 {
-	"name": "obsidian-api",
-	"version": "0.0.0",
-	"type": "module",
-	"packageManager": "bun@1.2.13",
-	"license": "MIT",
-	"description": "Local API for interacting with an Obsidian vault",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/michaelvessia/obsidian-api"
-	},
-	"publishConfig": {
-		"access": "public",
-		"directory": "dist"
-	},
-	"scripts": {
-		"dev": "bun run src/main.ts",
-		"codegen": "build-utils prepare-v2",
-		"build": "bun run build-esm && bun run build-annotate && bun run build-cjs && build-utils pack-v2",
-		"build-esm": "tsc -b tsconfig.build.json",
-		"build-cjs": "babel build/esm --plugins @babel/transform-export-namespace-from --plugins @babel/transform-modules-commonjs --out-dir build/cjs --source-maps",
-		"build-annotate": "babel build/esm --plugins annotate-pure-calls --out-dir build/esm --source-maps",
-		"typecheck": "tsc -b tsconfig.json",
-		"check": "bun run typecheck && bun run lint && bun run format && bun run test",
-		"lint": "biome lint . || nix develop --command biome lint .",
-		"lint-fix": "biome lint --write . || nix develop --command biome lint --write .",
-		"format": "biome format . || nix develop --command biome format .",
-		"format-fix": "biome format --write . || nix develop --command biome format --write .",
-		"test": "bun test",
-		"coverage": "bun test --coverage",
-		"prepare": "lefthook install",
-		"changeset-version": "changeset version && bun scripts/version.mjs",
-		"changeset-publish": "bun run build && TEST_DIST= bun run test && changeset publish"
-	},
-	"dependencies": {
-		"@effect/platform": "^0.90.6",
-		"@effect/platform-bun": "^0.79.0",
-		"effect": "^3.17.7"
-	},
-	"devDependencies": {
-		"@babel/cli": "^7.24.8",
-		"@babel/core": "^7.25.2",
-		"@babel/plugin-transform-export-namespace-from": "^7.24.7",
-		"@babel/plugin-transform-modules-commonjs": "^7.24.8",
-		"@biomejs/biome": "^2.3.5",
-		"@changesets/changelog-github": "^0.5.0",
-		"@changesets/cli": "^2.27.8",
-		"@effect/build-utils": "^0.8.9",
-		"@effect/language-service": "latest",
-		"@types/bun": "^1.2.20",
-		"babel-plugin-annotate-pure-calls": "^0.5.0",
-		"lefthook": "^2.0.2",
-		"tsx": "^4.17.0",
-		"typescript": "^5.6.2"
-	},
-	"effect": {
-		"generateExports": {
-			"include": [
-				"**/*.ts"
-			]
-		},
-		"generateIndex": {
-			"include": [
-				"**/*.ts"
-			]
-		}
-	},
-	"bun": {
-		"trustedDependencies": [
-			"@changesets/get-github-info"
-		]
-	}
+  "name": "obsidian-api",
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "bun@1.2.13",
+  "license": "MIT",
+  "description": "Local API for interacting with an Obsidian vault",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michaelvessia/obsidian-api"
+  },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
+  "scripts": {
+    "dev": "bun run src/main.ts",
+    "codegen": "build-utils prepare-v2",
+    "build": "bun run build-esm && bun run build-annotate && bun run build-cjs && build-utils pack-v2",
+    "build-esm": "tsc -b tsconfig.build.json",
+    "build-cjs": "babel build/esm --plugins @babel/transform-export-namespace-from --plugins @babel/transform-modules-commonjs --out-dir build/cjs --source-maps",
+    "build-annotate": "babel build/esm --plugins annotate-pure-calls --out-dir build/esm --source-maps",
+    "typecheck": "tsc -b tsconfig.json",
+    "check": "bun run typecheck && bun run lint && bun run format && bun run test",
+    "lint": "biome lint . || nix develop --command biome lint .",
+    "lint-fix": "biome lint --write . || nix develop --command biome lint --write .",
+    "format": "biome format . || nix develop --command biome format .",
+    "format-fix": "biome format --write . || nix develop --command biome format --write .",
+    "test": "bun test",
+    "coverage": "bun test --coverage",
+    "prepare": "lefthook install",
+    "changeset-version": "changeset version && bun scripts/version.mjs",
+    "changeset-publish": "bun run build && TEST_DIST= bun run test && changeset publish"
+  },
+  "dependencies": {
+    "@effect/platform": "^0.90.6",
+    "@effect/platform-bun": "^0.79.0",
+    "effect": "^3.17.7"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.24.8",
+    "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-export-namespace-from": "^7.24.7",
+    "@babel/plugin-transform-modules-commonjs": "^7.24.8",
+    "@biomejs/biome": "^2.3.5",
+    "@changesets/changelog-github": "^0.5.0",
+    "@changesets/cli": "^2.27.8",
+    "@effect/build-utils": "^0.8.9",
+    "@effect/language-service": "latest",
+    "@types/bun": "^1.2.20",
+    "babel-plugin-annotate-pure-calls": "^0.5.0",
+    "lefthook": "^2.0.2",
+    "tsx": "^4.17.0",
+    "typescript": "^5.6.2"
+  },
+  "effect": {
+    "generateExports": {
+      "include": [
+        "**/*.ts"
+      ]
+    },
+    "generateIndex": {
+      "include": [
+        "**/*.ts"
+      ]
+    }
+  },
+  "bun": {
+    "trustedDependencies": [
+      "@changesets/get-github-info"
+    ]
+  }
 }

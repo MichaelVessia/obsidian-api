@@ -1,392 +1,392 @@
-import { FileSystem, HttpApiError, Path } from "@effect/platform"
-import { BunContext } from "@effect/platform-bun"
-import { Effect, Fiber, Layer, Ref, Stream } from "effect"
-import { VaultConfig } from "../config/vault.js"
-import type { SearchResult } from "./api.js"
-import { parseFrontmatter } from "./domain.js"
-import { searchInContent } from "./functions.js"
+import { FileSystem, HttpApiError, Path } from '@effect/platform'
+import { BunContext } from '@effect/platform-bun'
+import { Effect, Fiber, Layer, Ref, Stream } from 'effect'
+import { VaultConfig } from '../config/vault.js'
+import type { SearchResult } from './api.js'
+import { parseFrontmatter } from './domain.js'
+import { searchInContent } from './functions.js'
 
 export interface VaultMetrics {
-	totalFiles: number
-	totalBytes: number
-	totalLines: number
-	averageFileSize: number
-	largestFile: { path: string; bytes: number }
-	smallestFile: { path: string; bytes: number }
+  totalFiles: number
+  totalBytes: number
+  totalLines: number
+  averageFileSize: number
+  largestFile: { path: string; bytes: number }
+  smallestFile: { path: string; bytes: number }
 }
 
-export class VaultService extends Effect.Service<VaultService>()("VaultService", {
-	scoped: Effect.gen(function* () {
-		const fs = yield* FileSystem.FileSystem
-		const path = yield* Path.Path
-		const config = yield* VaultConfig
+export class VaultService extends Effect.Service<VaultService>()('VaultService', {
+  scoped: Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const config = yield* VaultConfig
 
-		// Helper function to load all files
-		const loadAllFiles = Effect.gen(function* () {
-			const walkDirectory = (dirPath: string): Effect.Effect<Array<string>> =>
-				Effect.gen(function* () {
-					const entries = yield* fs.readDirectory(dirPath)
-					const files: Array<string> = []
+    // Helper function to load all files
+    const loadAllFiles = Effect.gen(function* () {
+      const walkDirectory = (dirPath: string): Effect.Effect<Array<string>> =>
+        Effect.gen(function* () {
+          const entries = yield* fs.readDirectory(dirPath)
+          const files: Array<string> = []
 
-					for (const entry of entries) {
-						// Skip ignored directories
-						if ([".obsidian"].some((pattern) => entry.includes(pattern))) {
-							continue
-						}
+          for (const entry of entries) {
+            // Skip ignored directories
+            if (['.obsidian'].some((pattern) => entry.includes(pattern))) {
+              continue
+            }
 
-						const fullPath = path.join(dirPath, entry)
-						const stat = yield* fs.stat(fullPath)
+            const fullPath = path.join(dirPath, entry)
+            const stat = yield* fs.stat(fullPath)
 
-						if (stat.type === "Directory") {
-							const subFiles = yield* walkDirectory(fullPath)
-							files.push(...subFiles)
-						} else if (stat.type === "File" && entry.endsWith(".md")) {
-							files.push(fullPath)
-						}
-					}
+            if (stat.type === 'Directory') {
+              const subFiles = yield* walkDirectory(fullPath)
+              files.push(...subFiles)
+            } else if (stat.type === 'File' && entry.endsWith('.md')) {
+              files.push(fullPath)
+            }
+          }
 
-					return files
-				}).pipe(Effect.catchAll(() => Effect.succeed([])))
+          return files
+        }).pipe(Effect.catchAll(() => Effect.succeed([])))
 
-			const files = yield* walkDirectory(config.vaultPath)
+      const files = yield* walkDirectory(config.vaultPath)
 
-			const fileContents = yield* Effect.forEach(
-				files,
-				(filePath) =>
-					Effect.gen(function* () {
-						const relativePath = path.relative(config.vaultPath, filePath)
-						const vaultFile = yield* Effect.gen(function* () {
-							const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
-							const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
-								Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content }))
-							)
+      const fileContents = yield* Effect.forEach(
+        files,
+        (filePath) =>
+          Effect.gen(function* () {
+            const relativePath = path.relative(config.vaultPath, filePath)
+            const vaultFile = yield* Effect.gen(function* () {
+              const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed('')))
+              const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
+                Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })),
+              )
 
-							const bytes = new TextEncoder().encode(mainContent).length
-							const lines = mainContent.split("\n").length
+              const bytes = new TextEncoder().encode(mainContent).length
+              const lines = mainContent.split('\n').length
 
-							return {
-								path: filePath,
-								content: mainContent,
-								frontmatter,
-								bytes,
-								lines
-							}
-						}).pipe(
-							Effect.catchAll(() =>
-								Effect.succeed({
-									path: filePath,
-									content: "",
-									frontmatter: {},
-									bytes: 0,
-									lines: 0
-								})
-							)
-						)
-						return [relativePath, vaultFile] as const
-					}),
-				{ concurrency: 10 }
-			)
+              return {
+                path: filePath,
+                content: mainContent,
+                frontmatter,
+                bytes,
+                lines,
+              }
+            }).pipe(
+              Effect.catchAll(() =>
+                Effect.succeed({
+                  path: filePath,
+                  content: '',
+                  frontmatter: {},
+                  bytes: 0,
+                  lines: 0,
+                }),
+              ),
+            )
+            return [relativePath, vaultFile] as const
+          }),
+        { concurrency: 10 },
+      )
 
-			return new Map(fileContents)
-		})
+      return new Map(fileContents)
+    })
 
-		// Initialize cache
-		const initialCache = yield* loadAllFiles
-		const cacheRef = yield* Ref.make(initialCache)
-		yield* Effect.logInfo(`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`).pipe(
-			Effect.annotateLogs({
-				vaultPath: config.vaultPath,
-				fileCount: initialCache.size
-			}),
-			Effect.ignore
-		)
+    // Initialize cache
+    const initialCache = yield* loadAllFiles
+    const cacheRef = yield* Ref.make(initialCache)
+    yield* Effect.logInfo(`Cache initialized with ${initialCache.size} files from ${config.vaultPath}`).pipe(
+      Effect.annotateLogs({
+        vaultPath: config.vaultPath,
+        fileCount: initialCache.size,
+      }),
+      Effect.ignore,
+    )
 
-		// Track pending updates to debounce rapid changes
-		const pendingUpdates = new Map<string, NodeJS.Timeout>()
+    // Track pending updates to debounce rapid changes
+    const pendingUpdates = new Map<string, NodeJS.Timeout>()
 
-		const updateFile = (filePath: string) =>
-			Effect.gen(function* () {
-				const exists = yield* fs.exists(filePath)
+    const updateFile = (filePath: string) =>
+      Effect.gen(function* () {
+        const exists = yield* fs.exists(filePath)
 
-				if (exists) {
-					const stat = yield* fs.stat(filePath)
-					if (stat.type === "File" && filePath.endsWith(".md")) {
-						const vaultFile = yield* Effect.gen(function* () {
-							const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
-							const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
-								Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content }))
-							)
+        if (exists) {
+          const stat = yield* fs.stat(filePath)
+          if (stat.type === 'File' && filePath.endsWith('.md')) {
+            const vaultFile = yield* Effect.gen(function* () {
+              const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed('')))
+              const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
+                Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })),
+              )
 
-							const bytes = new TextEncoder().encode(mainContent).length
-							const lines = mainContent.split("\n").length
+              const bytes = new TextEncoder().encode(mainContent).length
+              const lines = mainContent.split('\n').length
 
-							return {
-								path: filePath,
-								content: mainContent,
-								frontmatter,
-								bytes,
-								lines
-							}
-						}).pipe(
-							Effect.catchAll(() =>
-								Effect.succeed({
-									path: filePath,
-									content: "",
-									frontmatter: {},
-									bytes: 0,
-									lines: 0
-								})
-							)
-						)
-						const relativePath = path.relative(config.vaultPath, filePath)
-						yield* Ref.update(cacheRef, (cache) => {
-							const newCache = new Map(cache)
-							newCache.set(relativePath, vaultFile)
-							return newCache
-						})
-						yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
-							Effect.annotateLogs({ filePath: relativePath }),
-							Effect.ignore
-						)
-					}
-				} else {
-					// File deleted
-					const relativePath = path.relative(config.vaultPath, filePath)
-					yield* Ref.update(cacheRef, (cache) => {
-						const newCache = new Map(cache)
-						newCache.delete(relativePath)
-						return newCache
-					})
-					yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(
-						Effect.annotateLogs({ filePath: relativePath }),
-						Effect.ignore
-					)
-				}
-			}).pipe(Effect.catchAll(() => Effect.void))
+              return {
+                path: filePath,
+                content: mainContent,
+                frontmatter,
+                bytes,
+                lines,
+              }
+            }).pipe(
+              Effect.catchAll(() =>
+                Effect.succeed({
+                  path: filePath,
+                  content: '',
+                  frontmatter: {},
+                  bytes: 0,
+                  lines: 0,
+                }),
+              ),
+            )
+            const relativePath = path.relative(config.vaultPath, filePath)
+            yield* Ref.update(cacheRef, (cache) => {
+              const newCache = new Map(cache)
+              newCache.set(relativePath, vaultFile)
+              return newCache
+            })
+            yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
+              Effect.annotateLogs({ filePath: relativePath }),
+              Effect.ignore,
+            )
+          }
+        } else {
+          // File deleted
+          const relativePath = path.relative(config.vaultPath, filePath)
+          yield* Ref.update(cacheRef, (cache) => {
+            const newCache = new Map(cache)
+            newCache.delete(relativePath)
+            return newCache
+          })
+          yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(
+            Effect.annotateLogs({ filePath: relativePath }),
+            Effect.ignore,
+          )
+        }
+      }).pipe(Effect.catchAll(() => Effect.void))
 
-		const scheduleUpdate = (filePath: string): void => {
-			// Clear existing timeout for this file
-			const existing = pendingUpdates.get(filePath)
-			if (existing) {
-				clearTimeout(existing)
-			}
+    const scheduleUpdate = (filePath: string): void => {
+      // Clear existing timeout for this file
+      const existing = pendingUpdates.get(filePath)
+      if (existing) {
+        clearTimeout(existing)
+      }
 
-			// Schedule debounced update
-			const timeout = setTimeout(() => {
-				pendingUpdates.delete(filePath)
-				Effect.runPromise(updateFile(filePath))
-			}, config.debounceMs)
+      // Schedule debounced update
+      const timeout = setTimeout(() => {
+        pendingUpdates.delete(filePath)
+        Effect.runPromise(updateFile(filePath))
+      }, config.debounceMs)
 
-			pendingUpdates.set(filePath, timeout)
-		}
+      pendingUpdates.set(filePath, timeout)
+    }
 
-		// Set up file watcher using Effect's FileSystem API
-		const watchFiber = yield* Effect.fork(
-			fs.watch(config.vaultPath, { recursive: true }).pipe(
-				Stream.runForEach((event) =>
-					Effect.sync(() => {
-						if (event.path.endsWith(".md")) {
-							scheduleUpdate(event.path)
-						}
-					})
-				)
-			)
-		)
-		yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
-			Effect.annotateLogs({ vaultPath: config.vaultPath }),
-			Effect.ignore
-		)
+    // Set up file watcher using Effect's FileSystem API
+    const watchFiber = yield* Effect.fork(
+      fs.watch(config.vaultPath, { recursive: true }).pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event.path.endsWith('.md')) {
+              scheduleUpdate(event.path)
+            }
+          }),
+        ),
+      ),
+    )
+    yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
+      Effect.annotateLogs({ vaultPath: config.vaultPath }),
+      Effect.ignore,
+    )
 
-		// Cleanup watcher on scope release
-		yield* Effect.addFinalizer(() =>
-			Effect.gen(function* () {
-				yield* Fiber.interrupt(watchFiber)
-				// Clear any pending timeouts
-				for (const timeout of pendingUpdates.values()) {
-					clearTimeout(timeout)
-				}
-				pendingUpdates.clear()
-			})
-		)
+    // Cleanup watcher on scope release
+    yield* Effect.addFinalizer(() =>
+      Effect.gen(function* () {
+        yield* Fiber.interrupt(watchFiber)
+        // Clear any pending timeouts
+        for (const timeout of pendingUpdates.values()) {
+          clearTimeout(timeout)
+        }
+        pendingUpdates.clear()
+      }),
+    )
 
-		return {
-			getFile: (relativePath: string) =>
-				Effect.gen(function* () {
-					const cache = yield* Ref.get(cacheRef)
-					const vaultFile = cache.get(relativePath)
-					return vaultFile?.content
-				}),
+    return {
+      getFile: (relativePath: string) =>
+        Effect.gen(function* () {
+          const cache = yield* Ref.get(cacheRef)
+          const vaultFile = cache.get(relativePath)
+          return vaultFile?.content
+        }),
 
-			// HTTP-friendly getFile with error handling and filename normalization
-			getFileContent: (filename: string) =>
-				Effect.gen(function* () {
-					// Early return with BadRequest error for invalid input
-					if (!filename || filename.trim() === "") {
-						return yield* Effect.fail(new HttpApiError.BadRequest())
-					}
+      // HTTP-friendly getFile with error handling and filename normalization
+      getFileContent: (filename: string) =>
+        Effect.gen(function* () {
+          // Early return with BadRequest error for invalid input
+          if (!filename || filename.trim() === '') {
+            return yield* Effect.fail(new HttpApiError.BadRequest())
+          }
 
-					// Normalize filename to always end with .md
-					const normalizedFilename = filename.endsWith(".md") ? filename : `${filename}.md`
+          // Normalize filename to always end with .md
+          const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
 
-					// Get content from cache
-					const cache = yield* Ref.get(cacheRef)
-					const vaultFile = cache.get(normalizedFilename)
+          // Get content from cache
+          const cache = yield* Ref.get(cacheRef)
+          const vaultFile = cache.get(normalizedFilename)
 
-					// Convert undefined to NotFound error for API consistency
-					if (vaultFile === undefined) {
-						return yield* Effect.fail(new HttpApiError.NotFound())
-					}
+          // Convert undefined to NotFound error for API consistency
+          if (vaultFile === undefined) {
+            return yield* Effect.fail(new HttpApiError.NotFound())
+          }
 
-					return vaultFile.content
-				}),
+          return vaultFile.content
+        }),
 
-			getAllFiles: () =>
-				Effect.gen(function* () {
-					const cache = yield* Ref.get(cacheRef)
-					const stringMap = new Map<string, string>()
-					for (const [path, vaultFile] of cache.entries()) {
-						stringMap.set(path, vaultFile.content)
-					}
-					return stringMap
-				}),
+      getAllFiles: () =>
+        Effect.gen(function* () {
+          const cache = yield* Ref.get(cacheRef)
+          const stringMap = new Map<string, string>()
+          for (const [path, vaultFile] of cache.entries()) {
+            stringMap.set(path, vaultFile.content)
+          }
+          return stringMap
+        }),
 
-			searchInFiles: (query: string) =>
-				Effect.gen(function* () {
-					if (!query || query.trim() === "") {
-						return []
-					}
+      searchInFiles: (query: string) =>
+        Effect.gen(function* () {
+          if (!query || query.trim() === '') {
+            return []
+          }
 
-					const cache = yield* Ref.get(cacheRef)
-					const results: Array<SearchResult> = []
+          const cache = yield* Ref.get(cacheRef)
+          const results: Array<SearchResult> = []
 
-					// Optimized sequential search with pre-lowercased query
-					for (const [, vaultFile] of cache.entries()) {
-						const fileResults = searchInContent(vaultFile, query)
-						for (const result of fileResults) {
-							results.push(result)
-						}
-					}
+          // Optimized sequential search with pre-lowercased query
+          for (const [, vaultFile] of cache.entries()) {
+            const fileResults = searchInContent(vaultFile, query)
+            for (const result of fileResults) {
+              results.push(result)
+            }
+          }
 
-					return results
-				}),
+          return results
+        }),
 
-			reload: () =>
-				Effect.gen(function* () {
-					const newCache = yield* loadAllFiles
-					yield* Ref.set(cacheRef, newCache)
-					yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
-						Effect.annotateLogs({
-							vaultPath: config.vaultPath,
-							fileCount: newCache.size
-						}),
-						Effect.ignore
-					)
-				}),
+      reload: () =>
+        Effect.gen(function* () {
+          const newCache = yield* loadAllFiles
+          yield* Ref.set(cacheRef, newCache)
+          yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
+            Effect.annotateLogs({
+              vaultPath: config.vaultPath,
+              fileCount: newCache.size,
+            }),
+            Effect.ignore,
+          )
+        }),
 
-			getMetrics: (): Effect.Effect<VaultMetrics> =>
-				Effect.gen(function* () {
-					const files = yield* Ref.get(cacheRef)
+      getMetrics: (): Effect.Effect<VaultMetrics> =>
+        Effect.gen(function* () {
+          const files = yield* Ref.get(cacheRef)
 
-					let totalBytes = 0
-					let totalLines = 0
-					let largest = { path: "", bytes: 0 }
-					let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
+          let totalBytes = 0
+          let totalLines = 0
+          let largest = { path: '', bytes: 0 }
+          let smallest = { path: '', bytes: Number.MAX_SAFE_INTEGER }
 
-					for (const [path, vaultFile] of files.entries()) {
-						totalBytes += vaultFile.bytes
-						totalLines += vaultFile.lines
+          for (const [path, vaultFile] of files.entries()) {
+            totalBytes += vaultFile.bytes
+            totalLines += vaultFile.lines
 
-						if (vaultFile.bytes > largest.bytes) {
-							largest = { path, bytes: vaultFile.bytes }
-						}
-						if (vaultFile.bytes < smallest.bytes) {
-							smallest = { path, bytes: vaultFile.bytes }
-						}
-					}
+            if (vaultFile.bytes > largest.bytes) {
+              largest = { path, bytes: vaultFile.bytes }
+            }
+            if (vaultFile.bytes < smallest.bytes) {
+              smallest = { path, bytes: vaultFile.bytes }
+            }
+          }
 
-					return {
-						totalFiles: files.size,
-						totalBytes,
-						totalLines,
-						averageFileSize: files.size > 0 ? Math.round(totalBytes / files.size) : 0,
-						largestFile: largest.path ? largest : { path: "none", bytes: 0 },
-						smallestFile: smallest.path ? smallest : { path: "none", bytes: 0 }
-					}
-				})
-		}
-	}),
-	dependencies: [BunContext.layer]
+          return {
+            totalFiles: files.size,
+            totalBytes,
+            totalLines,
+            averageFileSize: files.size > 0 ? Math.round(totalBytes / files.size) : 0,
+            largestFile: largest.path ? largest : { path: 'none', bytes: 0 },
+            smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
+          }
+        }),
+    }
+  }),
+  dependencies: [BunContext.layer],
 }) {}
 
 export const VaultServiceTest = (cache: Map<string, string>) =>
-	Layer.succeed(
-		VaultService,
-		VaultService.make({
-			getFile: (relativePath: string) => Effect.succeed(cache.get(relativePath)),
-			getFileContent: (filename: string) => {
-				if (!filename || filename.trim() === "") {
-					return Effect.fail(new HttpApiError.BadRequest())
-				}
-				const normalizedFilename = filename.endsWith(".md") ? filename : `${filename}.md`
-				const content = cache.get(normalizedFilename)
-				if (content === undefined) {
-					return Effect.fail(new HttpApiError.NotFound())
-				}
-				return Effect.succeed(content)
-			},
-			getAllFiles: () => Effect.succeed(new Map(cache)),
-			searchInFiles: (query: string) => {
-				if (!query || query.trim() === "") {
-					return Effect.succeed([])
-				}
-				const results: Array<SearchResult> = []
-				for (const [filePath, content] of cache.entries()) {
-					const bytes = new TextEncoder().encode(content).length
-					const lines = content.split("\n").length
-					const vaultFile = {
-						path: filePath,
-						content,
-						frontmatter: {},
-						bytes,
-						lines
-					}
-					const fileResults = searchInContent(vaultFile, query)
-					for (const result of fileResults) {
-						results.push(result)
-					}
-				}
-				return Effect.succeed(results)
-			},
-			reload: () => Effect.void,
-			getMetrics: (): Effect.Effect<VaultMetrics> => {
-				let totalBytes = 0
-				let totalLines = 0
-				let largest = { path: "", bytes: 0 }
-				let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
+  Layer.succeed(
+    VaultService,
+    VaultService.make({
+      getFile: (relativePath: string) => Effect.succeed(cache.get(relativePath)),
+      getFileContent: (filename: string) => {
+        if (!filename || filename.trim() === '') {
+          return Effect.fail(new HttpApiError.BadRequest())
+        }
+        const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
+        const content = cache.get(normalizedFilename)
+        if (content === undefined) {
+          return Effect.fail(new HttpApiError.NotFound())
+        }
+        return Effect.succeed(content)
+      },
+      getAllFiles: () => Effect.succeed(new Map(cache)),
+      searchInFiles: (query: string) => {
+        if (!query || query.trim() === '') {
+          return Effect.succeed([])
+        }
+        const results: Array<SearchResult> = []
+        for (const [filePath, content] of cache.entries()) {
+          const bytes = new TextEncoder().encode(content).length
+          const lines = content.split('\n').length
+          const vaultFile = {
+            path: filePath,
+            content,
+            frontmatter: {},
+            bytes,
+            lines,
+          }
+          const fileResults = searchInContent(vaultFile, query)
+          for (const result of fileResults) {
+            results.push(result)
+          }
+        }
+        return Effect.succeed(results)
+      },
+      reload: () => Effect.void,
+      getMetrics: (): Effect.Effect<VaultMetrics> => {
+        let totalBytes = 0
+        let totalLines = 0
+        let largest = { path: '', bytes: 0 }
+        let smallest = { path: '', bytes: Number.MAX_SAFE_INTEGER }
 
-				for (const [path, content] of cache.entries()) {
-					const bytes = new TextEncoder().encode(content).length
-					const lines = content.split("\n").length
+        for (const [path, content] of cache.entries()) {
+          const bytes = new TextEncoder().encode(content).length
+          const lines = content.split('\n').length
 
-					totalBytes += bytes
-					totalLines += lines
+          totalBytes += bytes
+          totalLines += lines
 
-					if (bytes > largest.bytes) {
-						largest = { path, bytes }
-					}
-					if (bytes < smallest.bytes) {
-						smallest = { path, bytes }
-					}
-				}
+          if (bytes > largest.bytes) {
+            largest = { path, bytes }
+          }
+          if (bytes < smallest.bytes) {
+            smallest = { path, bytes }
+          }
+        }
 
-				return Effect.succeed({
-					totalFiles: cache.size,
-					totalBytes,
-					totalLines,
-					averageFileSize: cache.size > 0 ? Math.round(totalBytes / cache.size) : 0,
-					largestFile: largest.path ? largest : { path: "none", bytes: 0 },
-					smallestFile: smallest.path ? smallest : { path: "none", bytes: 0 }
-				})
-			}
-		})
-	)
+        return Effect.succeed({
+          totalFiles: cache.size,
+          totalBytes,
+          totalLines,
+          averageFileSize: cache.size > 0 ? Math.round(totalBytes / cache.size) : 0,
+          largestFile: largest.path ? largest : { path: 'none', bytes: 0 },
+          smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
+        })
+      },
+    }),
+  )
