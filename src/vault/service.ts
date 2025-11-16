@@ -6,15 +6,6 @@ import type { SearchResult } from './api.js'
 import { parseFrontmatter } from './domain.js'
 import { searchInContent } from './functions.js'
 
-export interface VaultMetrics {
-  totalFiles: number
-  totalBytes: number
-  totalLines: number
-  averageFileSize: number
-  largestFile: { path: string; bytes: number }
-  smallestFile: { path: string; bytes: number }
-}
-
 export class VaultService extends Effect.Service<VaultService>()('VaultService', {
   scoped: Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
@@ -283,7 +274,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           )
         }),
 
-      getMetrics: (): Effect.Effect<VaultMetrics> =>
+      getMetrics: (): Effect.Effect<string> =>
         Effect.gen(function* () {
           const files = yield* Ref.get(cacheRef)
 
@@ -304,14 +295,34 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             }
           }
 
-          return {
-            totalFiles: files.size,
-            totalBytes,
-            totalLines,
-            averageFileSize: files.size > 0 ? Math.round(totalBytes / files.size) : 0,
-            largestFile: largest.path ? largest : { path: 'none', bytes: 0 },
-            smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
-          }
+          const averageFileSize = files.size > 0 ? Math.round(totalBytes / files.size) : 0
+
+          // Generate Prometheus metrics format
+          const metrics = [
+            '# HELP obsidian_vault_files_total Total number of files in vault',
+            '# TYPE obsidian_vault_files_total gauge',
+            `obsidian_vault_files_total ${files.size}`,
+            '',
+            '# HELP obsidian_vault_bytes_total Total bytes in vault',
+            '# TYPE obsidian_vault_bytes_total gauge',
+            `obsidian_vault_bytes_total ${totalBytes}`,
+            '',
+            '# HELP obsidian_vault_lines_total Total lines in vault',
+            '# TYPE obsidian_vault_lines_total gauge',
+            `obsidian_vault_lines_total ${totalLines}`,
+            '',
+            '# HELP obsidian_vault_file_size_bytes Average file size in bytes',
+            '# TYPE obsidian_vault_file_size_bytes gauge',
+            `obsidian_vault_file_size_bytes{type="average"} ${averageFileSize}`,
+            `obsidian_vault_file_size_bytes{type="largest",file="${largest.path}"} ${largest.bytes}`,
+            `obsidian_vault_file_size_bytes{type="smallest",file="${smallest.path}"} ${smallest.bytes}`,
+            '',
+            '# HELP obsidian_api_up API server is up',
+            '# TYPE obsidian_api_up gauge',
+            'obsidian_api_up 1',
+          ].join('\n')
+
+          return metrics
         }),
     }
   }),
@@ -358,7 +369,7 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
         return Effect.succeed(results)
       },
       reload: () => Effect.void,
-      getMetrics: (): Effect.Effect<VaultMetrics> => {
+      getMetrics: (): Effect.Effect<string> => {
         let totalBytes = 0
         let totalLines = 0
         let largest = { path: '', bytes: 0 }
@@ -379,14 +390,34 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
           }
         }
 
-        return Effect.succeed({
-          totalFiles: cache.size,
-          totalBytes,
-          totalLines,
-          averageFileSize: cache.size > 0 ? Math.round(totalBytes / cache.size) : 0,
-          largestFile: largest.path ? largest : { path: 'none', bytes: 0 },
-          smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
-        })
+        const averageFileSize = cache.size > 0 ? Math.round(totalBytes / cache.size) : 0
+
+        // Generate Prometheus metrics format
+        const metrics = [
+          '# HELP obsidian_vault_files_total Total number of files in vault',
+          '# TYPE obsidian_vault_files_total gauge',
+          `obsidian_vault_files_total ${cache.size}`,
+          '',
+          '# HELP obsidian_vault_bytes_total Total bytes in vault',
+          '# TYPE obsidian_vault_bytes_total gauge',
+          `obsidian_vault_bytes_total ${totalBytes}`,
+          '',
+          '# HELP obsidian_vault_lines_total Total lines in vault',
+          '# TYPE obsidian_vault_lines_total gauge',
+          `obsidian_vault_lines_total ${totalLines}`,
+          '',
+          '# HELP obsidian_vault_file_size_bytes Average file size in bytes',
+          '# TYPE obsidian_vault_file_size_bytes gauge',
+          `obsidian_vault_file_size_bytes{type="average"} ${averageFileSize}`,
+          `obsidian_vault_file_size_bytes{type="largest",file="${largest.path}"} ${largest.bytes}`,
+          `obsidian_vault_file_size_bytes{type="smallest",file="${smallest.path}"} ${smallest.bytes}`,
+          '',
+          '# HELP obsidian_api_up API server is up',
+          '# TYPE obsidian_api_up gauge',
+          'obsidian_api_up 1',
+        ].join('\n')
+
+        return Effect.succeed(metrics)
       },
     }),
   )

@@ -44,20 +44,12 @@ export const vaultGroup = HttpApiGroup.make('Vault')
   )
   .add(
     HttpApiEndpoint.get('metrics', '/vault/metrics').addSuccess(
-      Schema.Struct({
-        totalFiles: Schema.Number,
-        totalBytes: Schema.Number,
-        totalLines: Schema.Number,
-        averageFileSize: Schema.Number,
-        largestFile: Schema.Struct({
-          path: Schema.String,
-          bytes: Schema.Number,
+      Schema.String.pipe(
+        HttpApiSchema.withEncoding({
+          kind: 'Text',
+          contentType: 'text/plain; version=0.0.4; charset=utf-8',
         }),
-        smallestFile: Schema.Struct({
-          path: Schema.String,
-          bytes: Schema.Number,
-        }),
-      }),
+      ),
     ),
   )
   .add(HttpApiEndpoint.get('search')`/vault/search/simple/${queryParam}`.addSuccess(SearchResults))

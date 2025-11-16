@@ -1,9 +1,12 @@
 import { HttpApi, HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from '@effect/platform'
 import { BunHttpServer } from '@effect/platform-bun'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Metric } from 'effect'
 import { VaultConfigLive } from '../config/vault.js'
 import { vaultGroup } from '../vault/api.js'
 import { VaultService } from '../vault/service.js'
+
+const _httpRequestDuration = Metric.timer('http_request_duration_seconds')
+const _httpRequestTotal = Metric.counter('http_requests_total')
 
 export const api = HttpApi.make('Obsidian API').add(vaultGroup)
 

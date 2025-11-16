@@ -1,0 +1,16 @@
+.direnv
+.flake
+.nix
+.git
+.github
+resources
+*.md
+.envrc
+flake.lock
+flake.nix
+lefthook.yml
+AGENTS.md
+CLAUDE.md
+RESOURCES.md
+.devbox
+.env
