@@ -161,11 +161,14 @@ describe('VaultService', () => {
       const service = yield* VaultService
       const metrics = yield* service.getMetrics()
 
-      expect(metrics).toContain('obsidian_vault_files_total 0')
-      expect(metrics).toContain('obsidian_vault_bytes_total 0')
-      expect(metrics).toContain('obsidian_vault_lines_total 0')
-      expect(metrics).toContain('obsidian_vault_file_size_bytes{type="average"} 0')
-      expect(metrics).toContain('obsidian_api_up 1')
+      expect(metrics).toEqual({
+        totalFiles: 0,
+        totalBytes: 0,
+        totalLines: 0,
+        averageFileSize: 0,
+        largestFile: { path: 'none', bytes: 0 },
+        smallestFile: { path: 'none', bytes: 0 },
+      })
     }).pipe(Effect.provide(VaultServiceTest(new Map()))))
 
   it('should calculate metrics for single file', () =>
@@ -173,10 +176,10 @@ describe('VaultService', () => {
       const service = yield* VaultService
       const metrics = yield* service.getMetrics()
 
-      expect(metrics).toContain('obsidian_vault_files_total 1')
-      expect(metrics).toContain('obsidian_vault_lines_total 3')
-      expect(metrics).toContain('file="test.md"')
-      expect(metrics).toContain('obsidian_api_up 1')
+      expect(metrics.totalFiles).toBe(1)
+      expect(metrics.totalLines).toBe(3)
+      expect(metrics.largestFile.path).toBe('test.md')
+      expect(metrics.smallestFile.path).toBe('test.md')
     }).pipe(Effect.provide(VaultServiceTest(new Map([['test.md', 'Line 1\nLine 2\nLine 3']])))))
 
   it('should calculate metrics for multiple files', () =>
@@ -184,11 +187,10 @@ describe('VaultService', () => {
       const service = yield* VaultService
       const metrics = yield* service.getMetrics()
 
-      expect(metrics).toContain('obsidian_vault_files_total 3')
-      expect(metrics).toContain('file="large.md"')
-      expect(metrics).toContain('file="small.md"')
-      expect(metrics).toContain('obsidian_vault_file_size_bytes{type="average"}')
-      expect(metrics).toContain('obsidian_api_up 1')
+      expect(metrics.totalFiles).toBe(3)
+      expect(metrics.largestFile.path).toBe('large.md')
+      expect(metrics.smallestFile.path).toBe('small.md')
+      expect(metrics.averageFileSize).toBeGreaterThan(0)
     }).pipe(
       Effect.provide(
         VaultServiceTest(
@@ -208,7 +210,7 @@ describe('VaultService', () => {
       const expectedBytes = new TextEncoder().encode(content).length
       const metrics = yield* service.getMetrics()
 
-      expect(metrics).toContain(`obsidian_vault_bytes_total ${expectedBytes}`)
+      expect(metrics.totalBytes).toBe(expectedBytes)
     }).pipe(Effect.provide(VaultServiceTest(new Map([['test.md', 'Hello']])))))
 
   // Additional service tests
@@ -337,11 +339,12 @@ describe('VaultService', () => {
         const service = yield* VaultService
         const metrics = yield* service.getMetrics()
 
-        expect(metrics).toContain('obsidian_vault_files_total 1')
-        expect(metrics).toContain('obsidian_vault_bytes_total 0')
-        expect(metrics).toContain('obsidian_vault_lines_total 1')
-        expect(metrics).toContain('obsidian_vault_file_size_bytes{type="average"} 0')
-        expect(metrics).toContain('file="empty.md"')
+        expect(metrics.totalFiles).toBe(1)
+        expect(metrics.totalBytes).toBe(0)
+        expect(metrics.totalLines).toBe(1) // Empty string still counts as 1 line
+        expect(metrics.averageFileSize).toBe(0)
+        expect(metrics.largestFile.path).toBe('empty.md')
+        expect(metrics.smallestFile.path).toBe('empty.md')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -352,9 +355,9 @@ describe('VaultService', () => {
         const service = yield* VaultService
         const metrics = yield* service.getMetrics()
 
-        expect(metrics).toContain('obsidian_vault_files_total 1')
-        expect(metrics).toContain('obsidian_vault_lines_total 4')
-        expect(metrics).toContain('obsidian_vault_bytes_total 3')
+        expect(metrics.totalFiles).toBe(1)
+        expect(metrics.totalLines).toBe(4) // 3 newlines = 4 lines
+        expect(metrics.totalBytes).toBe(3) // 3 newline characters
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
@@ -364,11 +367,10 @@ describe('VaultService', () => {
       return Effect.gen(function* () {
         const service = yield* VaultService
         const metrics = yield* service.getMetrics()
-        const expectedBytes = new TextEncoder().encode('Hello 世界 🌍').length
 
-        expect(metrics).toContain('obsidian_vault_files_total 1')
-        expect(metrics).toContain(`obsidian_vault_bytes_total ${expectedBytes}`)
-        expect(metrics).toContain('obsidian_vault_lines_total 1')
+        expect(metrics.totalFiles).toBe(1)
+        expect(metrics.totalBytes).toBe(new TextEncoder().encode('Hello 世界 🌍').length)
+        expect(metrics.totalLines).toBe(1)
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
   })
@@ -469,10 +471,10 @@ describe('VaultService', () => {
         const metrics = yield* service.getMetrics()
 
         // Tests the test layer's getMetrics implementation
-        expect(metrics).toContain('obsidian_vault_files_total 2')
-        expect(metrics).toContain('obsidian_vault_bytes_total')
-        expect(metrics).toContain('file="large.md"')
-        expect(metrics).toContain('file="small.md"')
+        expect(metrics.totalFiles).toBe(2)
+        expect(metrics.totalBytes).toBeGreaterThan(0)
+        expect(metrics.largestFile.path).toBe('large.md')
+        expect(metrics.smallestFile.path).toBe('small.md')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
   })
@@ -541,10 +543,10 @@ describe('VaultService', () => {
         const service = yield* VaultService
         const metrics = yield* service.getMetrics()
 
-        expect(metrics).toContain('obsidian_vault_files_total 3')
+        expect(metrics.totalFiles).toBe(3)
         // When files have equal size, the first one encountered should be largest/smallest
-        expect(metrics).toContain('file="file1.md"')
-        expect(metrics).toContain('file="file3.md"')
+        expect(metrics.largestFile.path).toBe('file1.md')
+        expect(metrics.smallestFile.path).toBe('file3.md')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 
