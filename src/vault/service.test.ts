@@ -1,26 +1,8 @@
 import { describe, expect, it } from "bun:test"
 import { Effect } from "effect"
-import {
-	VaultService,
-	VaultServiceTest,
-	walkDirectory,
-	loadFileContent,
-	loadAllFiles,
-	searchInContent
-} from "./service.js"
+import { VaultService, VaultServiceTest } from "./service.js"
+import { searchInContent } from "./functions.js"
 import type { VaultFile } from "./domain.js"
-
-// Mock Path implementation for testing
-const mockPath = {
-	join: (...paths: string[]) => paths.join("/"),
-	relative: (from: string, to: string) => to.replace(`${from}/`, ""),
-	sep: "/",
-	basename: (path: string) => path.split("/").pop() || "",
-	dirname: (path: string) => path.split("/").slice(0, -1).join("/"),
-	extname: (path: string) => (path.includes(".") ? `.${path.split(".").pop()}` : ""),
-	resolve: (...paths: string[]) => paths.join("/"),
-	normalize: (path: string) => path
-} as any
 
 describe("VaultService", () => {
 	it("should return file content for existing file", () => {
@@ -694,570 +676,163 @@ describe("VaultService", () => {
 			expect(results).toHaveLength(1)
 			expect(results[0].context).toContain("verylonglinewithsearchtermattheend")
 		})
+
+		it("should be case-insensitive", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "First line\nSEARCH TERM HERE\nThird line",
+				frontmatter: {},
+				bytes: 0,
+				lines: 3
+			}
+
+			const results = searchInContent(vaultFile, "search")
+
+			expect(results).toHaveLength(1)
+			expect(results[0].context).toContain("SEARCH TERM HERE")
+		})
+
+		it("should handle multiple matches in same file", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "First search term\nSecond line\nThird search term",
+				frontmatter: {},
+				bytes: 0,
+				lines: 3
+			}
+
+			const results = searchInContent(vaultFile, "search")
+
+			expect(results).toHaveLength(2)
+			expect(results[0].lineNumber).toBe(1)
+			expect(results[1].lineNumber).toBe(3)
+		})
+
+		it("should limit context to 100 characters around match", () => {
+			const longText = `${"a".repeat(150)}query${"b".repeat(150)}`
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: longText,
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "query")
+
+			expect(results).toHaveLength(1)
+			expect(results[0].context.length).toBeLessThanOrEqual(206) // 100 before + 5 (query) + 100 after + 1 for index difference
+			expect(results[0].context).toContain("query")
+		})
+
+		it("should handle empty content", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "",
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "search")
+
+			expect(results).toHaveLength(0)
+		})
+
+		it("should handle special characters in query", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Content with special chars: !@#$%^&*()",
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "!@#$%^&*()")
+
+			expect(results).toHaveLength(1)
+			expect(results[0].context).toContain("!@#$%^&*()")
+		})
+
+		it("should handle query at beginning and end of line", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "search at start\nend with search",
+				frontmatter: {},
+				bytes: 0,
+				lines: 2
+			}
+
+			const results = searchInContent(vaultFile, "search")
+
+			expect(results).toHaveLength(2)
+			expect(results[0].lineNumber).toBe(1)
+			expect(results[0].context).toContain("search at start")
+			expect(results[1].lineNumber).toBe(2)
+			expect(results[1].context).toContain("end with search")
+		})
+
+		it("should handle unicode characters correctly", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Hello 世界 🌍\nAnother line with 世界",
+				frontmatter: {},
+				bytes: 0,
+				lines: 2
+			}
+
+			const results = searchInContent(vaultFile, "世界")
+
+			expect(results).toHaveLength(2)
+			expect(results[0].lineNumber).toBe(1)
+			expect(results[1].lineNumber).toBe(2)
+		})
+
+		it("should handle empty query", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Some content here",
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "")
+
+			// Empty query should match all lines since empty string is included in any string
+			expect(results).toHaveLength(1)
+		})
+
+		it("should handle whitespace-only query", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Line with spaces\nAnother line",
+				frontmatter: {},
+				bytes: 0,
+				lines: 2
+			}
+
+			const results = searchInContent(vaultFile, "   ")
+
+			// Whitespace-only query should not match anything since spaces don't match empty string behavior
+			expect(results).toHaveLength(0)
+		})
+
+		it("should handle very long lines efficiently", () => {
+			const longLine = `${"word ".repeat(100)}target${" word".repeat(100)}`
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: longLine,
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "target")
+
+			expect(results).toHaveLength(1)
+			expect(results[0].context.length).toBeLessThanOrEqual(206) // Should still limit context
+			expect(results[0].context).toContain("target")
+		})
 	})
-})
-
-// Direct unit tests for internal functions
-describe("searchInContent", () => {
-	it("should find search matches with context", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "First line\nSearch term here\nThird line",
-			frontmatter: {},
-			bytes: 0,
-			lines: 3
-		}
-
-		const results = searchInContent(vaultFile, "search")
-
-		expect(results).toHaveLength(1)
-		expect(results[0].filePath).toBe("/test/file.md")
-		expect(results[0].lineNumber).toBe(2)
-		expect(results[0].context).toContain("Search term here")
-	})
-
-	it("should be case-insensitive", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "First line\nSEARCH TERM HERE\nThird line",
-			frontmatter: {},
-			bytes: 0,
-			lines: 3
-		}
-
-		const results = searchInContent(vaultFile, "search")
-
-		expect(results).toHaveLength(1)
-		expect(results[0].context).toContain("SEARCH TERM HERE")
-	})
-
-	it("should handle multiple matches in same file", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "First search term\nSecond line\nThird search term",
-			frontmatter: {},
-			bytes: 0,
-			lines: 3
-		}
-
-		const results = searchInContent(vaultFile, "search")
-
-		expect(results).toHaveLength(2)
-		expect(results[0].lineNumber).toBe(1)
-		expect(results[1].lineNumber).toBe(3)
-	})
-
-	it("should limit context to 100 characters around match", () => {
-		const longText = `${"a".repeat(150)}query${"b".repeat(150)}`
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: longText,
-			frontmatter: {},
-			bytes: 0,
-			lines: 1
-		}
-
-		const results = searchInContent(vaultFile, "query")
-
-		expect(results).toHaveLength(1)
-		expect(results[0].context.length).toBeLessThanOrEqual(206) // 100 before + 5 (query) + 100 after + 1 for index difference
-		expect(results[0].context).toContain("query")
-	})
-
-	it("should handle empty content", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "",
-			frontmatter: {},
-			bytes: 0,
-			lines: 1
-		}
-
-		const results = searchInContent(vaultFile, "search")
-
-		expect(results).toHaveLength(0)
-	})
-
-	it("should handle special characters in query", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "Content with special chars: !@#$%^&*()",
-			frontmatter: {},
-			bytes: 0,
-			lines: 1
-		}
-
-		const results = searchInContent(vaultFile, "!@#$%^&*()")
-
-		expect(results).toHaveLength(1)
-		expect(results[0].context).toContain("!@#$%^&*()")
-	})
-
-	it("should handle query at beginning and end of line", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "search at start\nend with search",
-			frontmatter: {},
-			bytes: 0,
-			lines: 2
-		}
-
-		const results = searchInContent(vaultFile, "search")
-
-		expect(results).toHaveLength(2)
-		expect(results[0].lineNumber).toBe(1)
-		expect(results[0].context).toContain("search at start")
-		expect(results[1].lineNumber).toBe(2)
-		expect(results[1].context).toContain("end with search")
-	})
-
-	it("should handle unicode characters correctly", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "Hello 世界 🌍\nAnother line with 世界",
-			frontmatter: {},
-			bytes: 0,
-			lines: 2
-		}
-
-		const results = searchInContent(vaultFile, "世界")
-
-		expect(results).toHaveLength(2)
-		expect(results[0].lineNumber).toBe(1)
-		expect(results[1].lineNumber).toBe(2)
-	})
-
-	it("should handle empty query", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "Some content here",
-			frontmatter: {},
-			bytes: 0,
-			lines: 1
-		}
-
-		const results = searchInContent(vaultFile, "")
-
-		// Empty query should match all lines since empty string is included in any string
-		expect(results).toHaveLength(1)
-	})
-
-	it("should handle whitespace-only query", () => {
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: "Line with spaces\nAnother line",
-			frontmatter: {},
-			bytes: 0,
-			lines: 2
-		}
-
-		const results = searchInContent(vaultFile, "   ")
-
-		// Whitespace-only query should not match anything since spaces don't match empty string behavior
-		expect(results).toHaveLength(0)
-	})
-
-	it("should handle very long lines efficiently", () => {
-		const longLine = `${"word ".repeat(10000)}target${" word".repeat(10000)}`
-		const vaultFile: VaultFile = {
-			path: "/test/file.md",
-			content: longLine,
-			frontmatter: {},
-			bytes: 0,
-			lines: 1
-		}
-
-		const results = searchInContent(vaultFile, "target")
-
-		expect(results).toHaveLength(1)
-		expect(results[0].context.length).toBeLessThanOrEqual(206) // Should still limit context
-		expect(results[0].context).toContain("target")
-	})
-})
-
-// Direct unit tests for other internal functions
-describe("loadFileContent", () => {
-	it("should handle file read errors gracefully", () =>
-		Effect.gen(function* () {
-			// Create a mock FileSystem that fails to read
-			const mockFs = {
-				readFileString: () => Effect.fail(new Error("File not found")),
-				stat: () => Effect.fail(new Error("Stat failed"))
-			} as any
-
-			const result = yield* loadFileContent(mockFs, "/nonexistent/file.md")
-
-			// Should return default VaultFile on error
-			expect(result.path).toBe("/nonexistent/file.md")
-			expect(result.content).toBe("")
-			expect(result.bytes).toBe(0)
-			expect(result.lines).toBe(0)
-		}))
-
-	it("should handle frontmatter parsing errors gracefully", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readFileString: () => Effect.succeed("Invalid frontmatter\n---\ncontent"),
-				stat: () => Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* loadFileContent(mockFs, "/test/file.md")
-
-			// Should handle parsing errors and return content as-is
-			expect(result.path).toBe("/test/file.md")
-			expect(result.content).toBe("Invalid frontmatter\n---\ncontent")
-			expect(result.bytes).toBeGreaterThan(0)
-			expect(result.lines).toBeGreaterThan(0)
-		}))
-
-	it("should parse valid frontmatter correctly", () =>
-		Effect.gen(function* () {
-			const contentWithFrontmatter = "---\ntitle: Test\nauthor: John\n---\n# Main Content\nSome text here"
-			const mockFs = {
-				readFileString: () => Effect.succeed(contentWithFrontmatter),
-				stat: () => Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* loadFileContent(mockFs, "/test/file.md")
-
-			expect(result.path).toBe("/test/file.md")
-			expect(result.content).toBe("# Main Content\nSome text here")
-			expect(result.frontmatter).toEqual({ title: "Test", author: "John" })
-			expect(result.bytes).toBe(new TextEncoder().encode("# Main Content\nSome text here").length)
-			expect(result.lines).toBe(2)
-		}))
-})
-
-describe("walkDirectory", () => {
-	it("should filter out ignored patterns", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", ".obsidian", "test.md", "temp.tmp"]),
-				stat: (path: string) =>
-					path.includes(".") ? Effect.succeed({ type: "File" }) : Effect.succeed({ type: "Directory" })
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test", [".obsidian"])
-
-			// Should only include .md files and exclude ignored patterns
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/test.md")
-			expect(result).not.toContain("/test/.obsidian")
-			expect(result).not.toContain("/test/temp.tmp")
-		}))
-
-	it("should handle nested directories recursively", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: (path: string) => {
-					if (path === "/test") return Effect.succeed(["file.md", "subdir"])
-					if (path === "/test/subdir") return Effect.succeed(["nested.md"])
-					return Effect.succeed([])
-				},
-				stat: (path: string) =>
-					path.includes("subdir") ? Effect.succeed({ type: "Directory" }) : Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/subdir/nested.md")
-		}))
-
-	it("should handle mixed file types and filter correctly", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", "file.txt", "image.png", "document.MD"]),
-				stat: (_path: string) => Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			// Should only include .md files (case insensitive)
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/document.MD")
-		}))
-
-	it("should handle custom ignore patterns", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", ".git", "node_modules", "temp.md"]),
-				stat: (path: string) => {
-					if (path.includes("node_modules")) return Effect.succeed({ type: "Directory" })
-					return Effect.succeed({ type: "File" })
-				}
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test", [".git", "node_modules"])
-
-			// Should exclude ignored patterns
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/temp.md")
-			expect(result).not.toContain("/test/.git")
-		}))
-
-	it("should handle deeply nested directory structures", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: (path: string) => {
-					if (path === "/test") return Effect.succeed(["a", "file.md"])
-					if (path === "/test/a") return Effect.succeed(["b"])
-					if (path === "/test/a/b") return Effect.succeed(["c"])
-					if (path === "/test/a/b/c") return Effect.succeed(["deep.md"])
-					return Effect.succeed([])
-				},
-				stat: (path: string) => {
-					if (path.endsWith(".md")) return Effect.succeed({ type: "File" })
-					return Effect.succeed({ type: "Directory" })
-				}
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/a/b/c/deep.md")
-		}))
-
-	it("should handle symlinks gracefully", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", "symlink.md"]),
-				stat: (path: string) => {
-					if (path.includes("symlink")) {
-						return Effect.fail(new Error("Symlink not supported"))
-					}
-					return Effect.succeed({ type: "File" })
-				}
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			// Should handle stat errors gracefully and still return valid files
-			expect(result).toHaveLength(1)
-			expect(result).toContain("/test/file.md")
-		}))
-
-	it("should handle directories with very long names", () =>
-		Effect.gen(function* () {
-			const longDirName = "a".repeat(255)
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", longDirName]),
-				stat: (path: string) => {
-					if (path.includes(longDirName)) {
-						return Effect.succeed({ type: "Directory" })
-					}
-					return Effect.succeed({ type: "File" })
-				}
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			expect(result).toHaveLength(1)
-			expect(result).toContain("/test/file.md")
-		}))
-
-	it("should handle case-insensitive file extensions", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", "file.MD", "file.Txt", "FILE.MD"]),
-				stat: () => Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			// Should include all .md files regardless of case
-			expect(result).toHaveLength(3)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/file.MD")
-			expect(result).toContain("/test/FILE.MD")
-			expect(result).not.toContain("/test/file.Txt")
-		}))
-
-	it("should test walkDirectory ignore pattern matching", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed([".obsidian", "file.md", "temp.md", ".git"]),
-				stat: () => Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test", [".obsidian", ".git"])
-
-			// Should filter out ignored patterns
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/temp.md")
-		}))
-
-	it("should test walkDirectory file extension filtering", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file.md", "file.txt", "file.json", "doc.MD"]),
-				stat: () => Effect.succeed({ type: "File" })
-			} as any
-
-			const result = yield* walkDirectory(mockFs, mockPath, "/test")
-
-			// Should only include .md files (case insensitive)
-			expect(result).toHaveLength(2)
-			expect(result).toContain("/test/file.md")
-			expect(result).toContain("/test/doc.MD")
-		}))
-})
-
-describe("loadAllFiles", () => {
-	it("should load all files from directory structure", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: (path: string) => {
-					if (path === "/vault") return Effect.succeed(["file1.md", "subdir"])
-					if (path === "/vault/subdir") return Effect.succeed(["nested.md"])
-					return Effect.succeed([])
-				},
-				stat: (path: string) =>
-					path.includes("subdir") ? Effect.succeed({ type: "Directory" }) : Effect.succeed({ type: "File" }),
-				readFileString: (path: string) => {
-					if (path.includes("file1")) return Effect.succeed("Content 1")
-					if (path.includes("file2")) return Effect.succeed("Content 2")
-					return Effect.succeed("")
-				}
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
-
-			expect(result.size).toBe(2)
-			// file1 should have default empty content due to error
-			expect(result.get("file1.md")?.content).toBe("")
-			expect(result.get("file2.md")?.content).toBe("Content 2")
-		}))
-
-	it("should handle empty directory", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed([]),
-				stat: () => Effect.succeed({ type: "File" }),
-				readFileString: () => Effect.succeed("")
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/empty")
-
-			expect(result.size).toBe(0)
-		}))
-
-	it("should handle file loading errors gracefully", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file1.md", "file2.md"]),
-				stat: () => Effect.succeed({ type: "File" }),
-				readFileString: (path: string) => {
-					if (path.includes("file1")) return Effect.fail(new Error("Read failed"))
-					return Effect.succeed("Content 2")
-				}
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
-
-			expect(result.size).toBe(2)
-			// file1 should have default empty content due to error
-			expect(result.get("file1.md")?.content).toBe("")
-			expect(result.get("file2.md")?.content).toBe("Content 2")
-		}))
-
-	it("should handle mixed directory and file structure", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: (path: string) => {
-					if (path === "/vault") return Effect.succeed(["root.md", "subdir", "empty.md"])
-					if (path === "/vault/subdir") return Effect.succeed(["nested.md"])
-					return Effect.succeed([])
-				},
-				stat: (path: string) => {
-					if (path.includes("subdir")) return Effect.succeed({ type: "Directory" })
-					return Effect.succeed({ type: "File" })
-				},
-				readFileString: (path: string) => {
-					if (path.includes("root")) return Effect.succeed("Root content")
-					if (path.includes("nested")) return Effect.succeed("Nested content")
-					if (path.includes("empty")) return Effect.succeed("")
-					return Effect.succeed("")
-				}
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
-
-			expect(result.size).toBe(3)
-			const rootFile = result.get("root.md")
-			const nestedFile = result.get("subdir/nested.md")
-			const emptyFile = result.get("empty.md")
-			expect(rootFile?.content).toBe("Root content")
-			expect(nestedFile?.content).toBe("Nested content")
-			expect(emptyFile?.content).toBe("")
-		}))
-
-	it("should handle mixed directory and file structure", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: (path: string) => {
-					if (path === "/vault") return Effect.succeed(["root.md", "subdir", "empty.md"])
-					if (path === "/vault/subdir") return Effect.succeed(["nested.md"])
-					return Effect.succeed([])
-				},
-				stat: (path: string) => {
-					if (path.includes("subdir")) return Effect.succeed({ type: "Directory" })
-					return Effect.succeed({ type: "File" })
-				},
-				readFileString: (path: string) => {
-					if (path.includes("root")) return Effect.succeed("Root content")
-					if (path.includes("nested")) return Effect.succeed("Nested content")
-					if (path.includes("empty")) return Effect.succeed("")
-					return Effect.succeed("")
-				}
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
-
-			expect(result.size).toBe(3)
-			const rootFile = result.get("root.md")
-			const nestedFile = result.get("subdir/nested.md")
-			const emptyFile = result.get("empty.md")
-			expect(rootFile?.content).toBe("Root content")
-			expect(nestedFile?.content).toBe("Nested content")
-			expect(emptyFile?.content).toBe("")
-		}))
-
-	it("should handle empty directory", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed([]),
-				stat: () => Effect.succeed({ type: "File" }),
-				readFileString: () => Effect.succeed("")
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/empty")
-
-			expect(result.size).toBe(0)
-		}))
-
-	it("should handle file loading errors gracefully", () =>
-		Effect.gen(function* () {
-			const mockFs = {
-				readDirectory: () => Effect.succeed(["file1.md", "file2.md"]),
-				stat: () => Effect.succeed({ type: "File" }),
-				readFileString: (path: string) => {
-					if (path.includes("file1")) return Effect.fail(new Error("Read failed"))
-					return Effect.succeed("Content 2")
-				}
-			} as any
-
-			const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
-
-			expect(result.size).toBe(2)
-			// file1 should have default empty content due to error
-			expect(result.get("file1.md")?.content).toBe("")
-			expect(result.get("file2.md")?.content).toBe("Content 2")
-		}))
 })
