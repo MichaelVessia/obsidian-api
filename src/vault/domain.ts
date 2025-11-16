@@ -8,27 +8,13 @@ export const Frontmatter = Schema.Record({
 export const VaultFile = Schema.Struct({
 	path: Schema.String,
 	content: Schema.String,
-	frontmatter: Frontmatter.pipe(Schema.optional)
-})
-
-export const VaultMetrics = Schema.Struct({
-	totalFiles: Schema.Number,
-	totalBytes: Schema.Number,
-	totalLines: Schema.Number,
-	averageFileSize: Schema.Number,
-	largestFile: Schema.Struct({
-		path: Schema.String,
-		bytes: Schema.Number
-	}),
-	smallestFile: Schema.Struct({
-		path: Schema.String,
-		bytes: Schema.Number
-	})
+	frontmatter: Frontmatter.pipe(Schema.optional),
+	bytes: Schema.Number,
+	lines: Schema.Number
 })
 
 export type Frontmatter = Schema.Schema.Type<typeof Frontmatter>
 export type VaultFile = Schema.Schema.Type<typeof VaultFile>
-export type VaultMetrics = Schema.Schema.Type<typeof VaultMetrics>
 
 const parseYamlValue = (valueStr: string): Effect.Effect<string | number | boolean | readonly string[]> => {
 	if (!valueStr) {

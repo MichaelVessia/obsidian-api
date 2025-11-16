@@ -3,7 +3,16 @@ import { BunContext } from "@effect/platform-bun"
 import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import type { SearchResult } from "./api.js"
-import { parseFrontmatter, type VaultFile, type VaultMetrics } from "./domain.js"
+import { parseFrontmatter, type VaultFile } from "./domain.js"
+
+export interface VaultMetrics {
+	totalFiles: number
+	totalBytes: number
+	totalLines: number
+	averageFileSize: number
+	largestFile: { path: string; bytes: number }
+	smallestFile: { path: string; bytes: number }
+}
 
 const walkDirectory = (
 	fs: FileSystem.FileSystem,
@@ -38,22 +47,30 @@ const walkDirectory = (
 	}).pipe(Effect.catchAll(() => Effect.succeed([])))
 
 const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Effect<VaultFile> =>
-	fs.readFileString(filePath).pipe(
-		Effect.catchAll(() => Effect.succeed("")),
-		Effect.flatMap((content) =>
-			parseFrontmatter(content).pipe(
-				Effect.map(({ frontmatter, content: mainContent }) => ({
-					path: filePath,
-					content: mainContent,
-					frontmatter
-				}))
-			)
-		),
+	Effect.gen(function* () {
+		const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
+		const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
+			Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content }))
+		)
+
+		const bytes = new TextEncoder().encode(mainContent).length
+		const lines = mainContent.split("\n").length
+
+		return {
+			path: filePath,
+			content: mainContent,
+			frontmatter,
+			bytes,
+			lines
+		}
+	}).pipe(
 		Effect.catchAll(() =>
 			Effect.succeed({
 				path: filePath,
 				content: "",
-				frontmatter: {}
+				frontmatter: {},
+				bytes: 0,
+				lines: 0
 			})
 		)
 	)
@@ -289,17 +306,14 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 					let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
 
 					for (const [path, vaultFile] of files.entries()) {
-						const bytes = new TextEncoder().encode(vaultFile.content).length
-						const lines = vaultFile.content.split("\n").length
+						totalBytes += vaultFile.bytes
+						totalLines += vaultFile.lines
 
-						totalBytes += bytes
-						totalLines += lines
-
-						if (bytes > largest.bytes) {
-							largest = { path, bytes }
+						if (vaultFile.bytes > largest.bytes) {
+							largest = { path, bytes: vaultFile.bytes }
 						}
-						if (bytes < smallest.bytes) {
-							smallest = { path, bytes }
+						if (vaultFile.bytes < smallest.bytes) {
+							smallest = { path, bytes: vaultFile.bytes }
 						}
 					}
 
@@ -340,7 +354,9 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
 				}
 				const results: Array<SearchResult> = []
 				for (const [filePath, content] of cache.entries()) {
-					const vaultFile = { path: filePath, content, frontmatter: {} }
+					const bytes = new TextEncoder().encode(content).length
+					const lines = content.split("\n").length
+					const vaultFile = { path: filePath, content, frontmatter: {}, bytes, lines }
 					const fileResults = searchInContent(vaultFile, query)
 					for (const result of fileResults) {
 						results.push(result)
