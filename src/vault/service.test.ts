@@ -847,7 +847,7 @@ describe("walkDirectory comprehensive tests", () => {
 		Effect.gen(function* () {
 			const mockFs = {
 				readDirectory: () => Effect.succeed(["file.md", "file.txt", "image.png", "document.MD"]),
-				stat: (path: string) => Effect.succeed({ type: "File" })
+				stat: (_path: string) => Effect.succeed({ type: "File" })
 			} as any
 
 			const result = yield* walkDirectory(mockFs, mockPath, "/test")
