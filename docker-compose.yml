@@ -33,6 +33,16 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:latest
     ports:
