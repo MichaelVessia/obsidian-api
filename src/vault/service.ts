@@ -14,7 +14,7 @@ export interface VaultMetrics {
 	smallestFile: { path: string; bytes: number }
 }
 
-const walkDirectory = (
+export const walkDirectory = (
 	fs: FileSystem.FileSystem,
 	path: Path.Path,
 	dirPath: string,
@@ -46,7 +46,7 @@ const walkDirectory = (
 		return files
 	}).pipe(Effect.catchAll(() => Effect.succeed([])))
 
-const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Effect<VaultFile> =>
+export const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Effect<VaultFile> =>
 	Effect.gen(function* () {
 		const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
 		const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
@@ -75,7 +75,7 @@ const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Ef
 		)
 	)
 
-const loadAllFiles = (
+export const loadAllFiles = (
 	fs: FileSystem.FileSystem,
 	path: Path.Path,
 	vaultPath: string
@@ -97,7 +97,7 @@ const loadAllFiles = (
 		return new Map(fileContents)
 	})
 
-const searchInContent = (vaultFile: VaultFile, query: string): Array<SearchResult> => {
+export const searchInContent = (vaultFile: VaultFile, query: string): Array<SearchResult> => {
 	const lines = vaultFile.content.split("\n")
 	const results: Array<SearchResult> = []
 	const lowerQuery = query.toLowerCase()
