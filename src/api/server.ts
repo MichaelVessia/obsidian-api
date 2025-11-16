@@ -60,7 +60,7 @@ const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   HttpServer.withLogAddress,
 )
 
-const port = 3001
+const port = 3000
 
 const Server = BunHttpServer.layer({ port })
 
