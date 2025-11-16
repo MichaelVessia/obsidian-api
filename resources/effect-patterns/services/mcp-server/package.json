@@ -1,0 +1,61 @@
+{
+  "name": "@effect-patterns/mcp-server",
+  "version": "0.5.0",
+  "type": "module",
+  "packageManager": "bun@1.2.23",
+  "description": "Effect Patterns MCP Server - API endpoints for Claude Code Plugin",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "bunx vitest run",
+    "test:unit": "bunx vitest run",
+    "test:integration": "echo 'Note: Requires running server (bun run dev)' && bunx vitest run --config vitest.integration.config.ts",
+    "test:integration:skip": "echo 'Integration tests skipped (require running server)'",
+    "test:watch": "bunx vitest",
+    "test:coverage": "bunx vitest run --coverage",
+    "test:all": "bunx vitest run --config vitest.integration.config.ts",
+    "smoke-test": "bun run smoke-test.ts",
+    "smoke-test:bash": "bash smoke-test.sh",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@effect-patterns/toolkit": "workspace:*",
+    "@effect/platform": "^0.93.0",
+    "@effect/platform-node": "^0.94.2",
+    "@effect/schema": "^0.75.5",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
+    "@opentelemetry/resources": "^2.1.0",
+    "@opentelemetry/sdk-node": "^0.208.0",
+    "@opentelemetry/sdk-trace-node": "^2.1.0",
+    "@opentelemetry/semantic-conventions": "^1.37.0",
+    "effect": "^3.18.2",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "vercel": "^48.6.0"
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "^2.0.53",
+    "@types/node": "^24.9.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^4.0.4",
+    "ai": "^5.0.80",
+    "eslint": "^9.37.0",
+    "eslint-config-next": "^16.0.0",
+    "typescript": "5.9.3",
+    "vitest": "^4.0.4"
+  },
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "patterns",
+    "mcp",
+    "api"
+  ],
+  "author": "Paul",
+  "license": "MIT"
+}

@@ -1,0 +1,49 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "lib": ["ES2020"],
+    "types": ["node"],
+    "downlevelIteration": true,
+    "moduleDetection": "force",
+    "allowSyntheticDefaultImports": true,
+    "resolvePackageJsonExports": true,
+    "resolvePackageJsonImports": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "transform": "@effect/language-service/transform",
+        "diagnosticSeverity": {
+          "floatingEffect": "error",
+          "unnecessaryGen": "warning",
+          "tryCatchInGen": "warning"
+        }
+      }
+    ]
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "content/src/**/*.ts",
+    "content/new/src/**/*.ts",
+    "content/new/processed/**/*.ts",
+    "content/new/raw/**/*.ts",
+    "cli/src/**/*.ts",
+    "agents/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "archive/**",
+    "content/backups/**",
+    "content-backup-*/**",
+    "scripts/autofix/ai/suggestions/**"
+  ]
+}
