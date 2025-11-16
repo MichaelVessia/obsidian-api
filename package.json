@@ -33,8 +33,10 @@
     "changeset-publish": "bun run build && TEST_DIST= bun run test && changeset publish"
   },
   "dependencies": {
+    "@effect/opentelemetry": "^0.59.0",
     "@effect/platform": "^0.90.6",
     "@effect/platform-bun": "^0.79.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
     "effect": "^3.17.7"
   },
   "devDependencies": {

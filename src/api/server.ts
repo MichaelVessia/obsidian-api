@@ -4,20 +4,23 @@ import { Effect, Layer } from 'effect'
 import { VaultConfigLive } from '../config/vault.js'
 import { vaultGroup } from '../vault/api.js'
 import { VaultService } from '../vault/service.js'
+import { TracerLayer } from '../tracing/index.js'
 
 export const api = HttpApi.make('Obsidian API').add(vaultGroup)
 
 const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
   handlers
     .handle('getFile', ({ path: { filename } }) =>
-      Effect.flatMap(VaultService, (service) => service.getFileContent(filename)),
+      Effect.flatMap(VaultService, (service) => service.getFileContent(filename)).pipe(
+        Effect.withSpan('vault.getFile', { attributes: { filename } }),
+      ),
     )
     .handle('listFiles', () =>
       Effect.gen(function* () {
         const vault = yield* VaultService
         const files = yield* vault.getAllFiles()
         return Object.fromEntries(files)
-      }),
+      }).pipe(Effect.withSpan('vault.listFiles')),
     )
     .handle('reload', () =>
       Effect.gen(function* () {
@@ -28,10 +31,16 @@ const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
           message: 'Vault reloaded successfully',
           filesLoaded: files.size,
         }
-      }),
+      }).pipe(Effect.withSpan('vault.reload')),
     )
-    .handle('metrics', () => Effect.flatMap(VaultService, (service) => service.getMetrics()))
-    .handle('search', ({ path: { query } }) => Effect.flatMap(VaultService, (service) => service.searchInFiles(query))),
+    .handle('metrics', () =>
+      Effect.flatMap(VaultService, (service) => service.getMetrics()).pipe(Effect.withSpan('vault.metrics')),
+    )
+    .handle('search', ({ path: { query } }) =>
+      Effect.flatMap(VaultService, (service) => service.searchInFiles(query)).pipe(
+        Effect.withSpan('vault.search', { attributes: { query } }),
+      ),
+    ),
 )
 
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
@@ -51,8 +60,8 @@ const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   HttpServer.withLogAddress,
 )
 
-const port = 3000
+const port = 3001
 
 const Server = BunHttpServer.layer({ port })
 
-export const ApiServer = Layer.provide(HttpLive, Server)
+export const ApiServer = Layer.provide(HttpLive, Server).pipe(Layer.provide(TracerLayer))

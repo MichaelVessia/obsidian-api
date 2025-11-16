@@ -48,7 +48,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           return files
         }).pipe(Effect.catchAll(() => Effect.succeed([])))
 
-      const files = yield* walkDirectory(config.vaultPath)
+      const files = yield* walkDirectory(config.vaultPath).pipe(
+        Effect.withSpan('vault.walkDirectory', { attributes: { dirPath: config.vaultPath } }),
+      )
 
       const fileContents = yield* Effect.forEach(
         files,
@@ -238,7 +240,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           }
 
           return vaultFile.content
-        }),
+        }).pipe(Effect.withSpan('vault.getFileContent', { attributes: { filename } })),
 
       getAllFiles: () =>
         Effect.gen(function* () {
@@ -248,7 +250,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             stringMap.set(path, vaultFile.content)
           }
           return stringMap
-        }),
+        }).pipe(Effect.withSpan('vault.getAllFiles')),
 
       searchInFiles: (query: string) =>
         Effect.gen(function* () {
@@ -268,7 +270,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           }
 
           return results
-        }),
+        }).pipe(Effect.withSpan('vault.searchInFiles', { attributes: { query } })),
 
       reload: () =>
         Effect.gen(function* () {
@@ -281,7 +283,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             }),
             Effect.ignore,
           )
-        }),
+        }).pipe(Effect.withSpan('vault.reload')),
 
       getMetrics: (): Effect.Effect<VaultMetrics> =>
         Effect.gen(function* () {
