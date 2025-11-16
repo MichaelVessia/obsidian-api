@@ -841,8 +841,8 @@ describe("loadAllFiles", () => {
 		}))
 })
 
-// Additional comprehensive unit tests for internal functions
-describe("walkDirectory comprehensive tests", () => {
+// File system operations tests
+describe("walkDirectory", () => {
 	it("should handle mixed file types and filter correctly", () =>
 		Effect.gen(function* () {
 			const mockFs = {
@@ -995,4 +995,479 @@ describe("loadAllFiles comprehensive tests", () => {
 			expect(nestedFile?.content).toBe("Nested content")
 			expect(emptyFile?.content).toBe("")
 		}))
+
+	// Service layer edge cases
+	describe("VaultService edge cases", () => {
+		it("should handle search with regex special characters", () => {
+			const cache = new Map([["test.md", "Content with [brackets] and {braces}"]])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const results = yield* service.searchInFiles("[brackets]")
+
+				expect(results).toHaveLength(1)
+				expect(results[0].context).toContain("[brackets]")
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle search with newlines in content", () => {
+			const cache = new Map([["test.md", "Line 1\nsearch term\nLine 3\nmore search"]])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const results = yield* service.searchInFiles("search")
+
+				expect(results).toHaveLength(2)
+				expect(results[0].lineNumber).toBe(2)
+				expect(results[1].lineNumber).toBe(4)
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle getFileContent with filename containing path separators", () => {
+			const cache = new Map([["subdir/file.md", "content"]])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const result = yield* Effect.either(service.getFileContent("subdir/file"))
+
+				expect(result._tag).toBe("Left")
+				if (result._tag === "Left") {
+					expect(result.left._tag).toBe("NotFound")
+				}
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle very long filenames", () => {
+			const longFilename = "a".repeat(200)
+			const cache = new Map([[`${longFilename}.md`, "content"]])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const content = yield* service.getFileContent(longFilename)
+
+				expect(content).toBe("content")
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle metrics with files of equal size", () => {
+			const cache = new Map([
+				["file1.md", "same size"],
+				["file2.md", "same size"],
+				["file3.md", "different"]
+			])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const metrics = yield* service.getMetrics()
+
+				expect(metrics.totalFiles).toBe(3)
+				// When files have equal size, the first one encountered should be largest/smallest
+				expect(metrics.largestFile.path).toBe("file1.md")
+				expect(metrics.smallestFile.path).toBe("file3.md")
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle search with overlapping matches", () => {
+			const cache = new Map([["test.md", "testtest test"]])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const results = yield* service.searchInFiles("test")
+
+				expect(results).toHaveLength(1) // Should find line once, not multiple times for overlapping matches
+				expect(results[0].context).toContain("testtest test")
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle getFileContent with null/undefined input", () => {
+			const cache = new Map([["test.md", "content"]])
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+
+				// Test with undefined
+				const result1 = yield* Effect.either(service.getFileContent(undefined as any))
+				expect(result1._tag).toBe("Left")
+				if (result1._tag === "Left") {
+					expect(result1.left._tag).toBe("BadRequest")
+				}
+
+				// Test with null
+				const result2 = yield* Effect.either(service.getFileContent(null as any))
+				expect(result2._tag).toBe("Left")
+				if (result2._tag === "Left") {
+					expect(result2.left._tag).toBe("BadRequest")
+				}
+			}).pipe(Effect.provide(VaultServiceTest(cache)))
+		})
+
+		it("should handle cache with very large number of files", () => {
+			const largeCache = new Map()
+			for (let i = 0; i < 1000; i++) {
+				largeCache.set(`file${i}.md`, `Content of file ${i}`)
+			}
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const allFiles = yield* service.getAllFiles()
+
+				expect(allFiles.size).toBe(1000)
+				expect(allFiles.get("file0.md")).toBe("Content of file 0")
+				expect(allFiles.get("file999.md")).toBe("Content of file 999")
+			}).pipe(Effect.provide(VaultServiceTest(largeCache)))
+		})
+
+		it("should handle search performance with large cache", () => {
+			const largeCache = new Map()
+			for (let i = 0; i < 100; i++) {
+				largeCache.set(`file${i}.md`, i === 50 ? "search term here" : "other content")
+			}
+
+			return Effect.gen(function* () {
+				const service = yield* VaultService
+				const results = yield* service.searchInFiles("search")
+
+				expect(results).toHaveLength(1)
+				expect(results[0].filePath).toBe("file50.md")
+			}).pipe(Effect.provide(VaultServiceTest(largeCache)))
+		})
+	})
+
+	// Tests for internal function edge cases that might not be covered
+	describe("searchInContent additional edge cases", () => {
+		it("should handle query with line breaks", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Line 1\nLine 2\nLine 3",
+				frontmatter: {},
+				bytes: 0,
+				lines: 3
+			}
+
+			const results = searchInContent(vaultFile, "Line 1\nLine 2")
+
+			// Should not match multi-line queries
+			expect(results).toHaveLength(0)
+		})
+
+		it("should handle content with only whitespace", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "   \n  \t  \n   ",
+				frontmatter: {},
+				bytes: 0,
+				lines: 3
+			}
+
+			const results = searchInContent(vaultFile, " ")
+
+			expect(results).toHaveLength(3) // Should match each line with spaces
+		})
+
+		it("should handle exact match with case sensitivity", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Test TEST test TeSt",
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "test")
+
+			expect(results).toHaveLength(1)
+			expect(results[0].context).toContain("Test TEST test TeSt")
+		})
+
+		it("should handle context extraction at line boundaries", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "verylonglinewithsearchtermattheend",
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "searchterm")
+
+			expect(results).toHaveLength(1)
+			expect(results[0].context).toContain("verylonglinewithsearchtermattheend")
+		})
+	})
+
+	// Additional tests for loadFileContent edge cases
+	describe("loadFileContent additional edge cases", () => {
+		it("should handle files with BOM (Byte Order Mark)", () =>
+			Effect.gen(function* () {
+				const contentWithBOM = "\uFEFF---\ntitle: Test\n---\nContent"
+				const mockFs = {
+					readFileString: () => Effect.succeed(contentWithBOM),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* loadFileContent(mockFs, "/test/bom.md")
+
+				expect(result.content).toBe("Content")
+				expect(result.frontmatter).toEqual({ title: "Test" })
+			}))
+
+		it("should handle files with Windows line endings", () =>
+			Effect.gen(function* () {
+				const contentWithCRLF = "Line 1\r\nLine 2\r\nLine 3"
+				const mockFs = {
+					readFileString: () => Effect.succeed(contentWithCRLF),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* loadFileContent(mockFs, "/test/crlf.md")
+
+				expect(result.lines).toBe(3) // Should count lines correctly despite \r\n
+				expect(result.content).toBe(contentWithCRLF)
+			}))
+
+		it("should handle files with mixed line endings", () =>
+			Effect.gen(function* () {
+				const mixedContent = "Line 1\nLine 2\r\nLine 3\rLine 4"
+				const mockFs = {
+					readFileString: () => Effect.succeed(mixedContent),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* loadFileContent(mockFs, "/test/mixed.md")
+
+				expect(result.lines).toBe(4)
+				expect(result.content).toBe(mixedContent)
+			}))
+	})
+
+	// Additional tests for walkDirectory edge cases
+	describe("walkDirectory additional edge cases", () => {
+		it("should handle symlinks gracefully", () =>
+			Effect.gen(function* () {
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file.md", "symlink.md"]),
+					stat: (path: string) => {
+						if (path.includes("symlink")) {
+							return Effect.fail(new Error("Symlink not supported"))
+						}
+						return Effect.succeed({ type: "File" })
+					}
+				} as any
+
+				const result = yield* walkDirectory(mockFs, mockPath, "/test")
+
+				// Should handle stat errors gracefully and still return valid files
+				expect(result).toHaveLength(1)
+				expect(result).toContain("/test/file.md")
+			}))
+
+		it("should handle directories with very long names", () =>
+			Effect.gen(function* () {
+				const longDirName = "a".repeat(255)
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file.md", longDirName]),
+					stat: (path: string) => {
+						if (path.includes(longDirName)) {
+							return Effect.succeed({ type: "Directory" })
+						}
+						return Effect.succeed({ type: "File" })
+					}
+				} as any
+
+				const result = yield* walkDirectory(mockFs, mockPath, "/test")
+
+				expect(result).toHaveLength(1)
+				expect(result).toContain("/test/file.md")
+			}))
+
+		it("should handle case-insensitive file extensions", () =>
+			Effect.gen(function* () {
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file.md", "file.MD", "file.Txt", "FILE.MD"]),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* walkDirectory(mockFs, mockPath, "/test")
+
+				// Should include all .md files regardless of case
+				expect(result).toHaveLength(3)
+				expect(result).toContain("/test/file.md")
+				expect(result).toContain("/test/file.MD")
+				expect(result).toContain("/test/FILE.MD")
+				expect(result).not.toContain("/test/file.Txt")
+			}))
+	})
+
+	// Additional tests for loadAllFiles edge cases
+	describe("loadAllFiles additional edge cases", () => {
+		it("should handle concurrent file loading errors", () =>
+			Effect.gen(function* () {
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file1.md", "file2.md", "file3.md"]),
+					stat: () => Effect.succeed({ type: "File" }),
+					readFileString: (path: string) => {
+						if (path.includes("file2")) return Effect.fail(new Error("Concurrent error"))
+						if (path.includes("file3")) return Effect.fail(new Error("Another error"))
+						return Effect.succeed("Valid content")
+					}
+				} as any
+
+				const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
+
+				expect(result.size).toBe(3)
+				expect(result.get("file1.md")?.content).toBe("Valid content")
+				expect(result.get("file2.md")?.content).toBe("")
+				expect(result.get("file3.md")?.content).toBe("")
+			}))
+
+		it("should handle files with very large content", () =>
+			Effect.gen(function* () {
+				const largeContent = "x".repeat(1000000) // 1MB of 'x' characters
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["large.md"]),
+					stat: () => Effect.succeed({ type: "File" }),
+					readFileString: () => Effect.succeed(largeContent)
+				} as any
+
+				const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
+
+				expect(result.size).toBe(1)
+				const file = result.get("large.md")
+				expect(file?.content).toBe(largeContent)
+				expect(file?.bytes).toBe(1000000)
+			}))
+
+		it("should handle empty relative paths in loadAllFiles", () =>
+			Effect.gen(function* () {
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file.md"]),
+					stat: () => Effect.succeed({ type: "File" }),
+					readFileString: () => Effect.succeed("content")
+				} as any
+
+				const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
+
+				expect(result.size).toBe(1)
+				// Should handle relative path calculation correctly
+				expect(result.has("file.md")).toBe(true)
+			}))
+	})
+
+	// Additional tests for specific uncovered lines in utility functions
+	describe("uncovered utility function tests", () => {
+		it("should test walkDirectory ignore pattern matching", () =>
+			Effect.gen(function* () {
+				const mockFs = {
+					readDirectory: () => Effect.succeed([".obsidian", "file.md", "temp.md", ".git"]),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* walkDirectory(mockFs, mockPath, "/test", [".obsidian", ".git"])
+
+				// Should filter out ignored patterns
+				expect(result).toHaveLength(2)
+				expect(result).toContain("/test/file.md")
+				expect(result).toContain("/test/temp.md")
+			}))
+
+		it("should test walkDirectory file extension filtering", () =>
+			Effect.gen(function* () {
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file.md", "file.txt", "file.json", "doc.MD"]),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* walkDirectory(mockFs, mockPath, "/test")
+
+				// Should only include .md files (case insensitive)
+				expect(result).toHaveLength(2)
+				expect(result).toContain("/test/file.md")
+				expect(result).toContain("/test/doc.MD")
+			}))
+
+		it("should test loadFileContent with empty frontmatter", () =>
+			Effect.gen(function* () {
+				const contentWithEmptyFrontmatter = "---\n---\nContent after empty frontmatter"
+				const mockFs = {
+					readFileString: () => Effect.succeed(contentWithEmptyFrontmatter),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* loadFileContent(mockFs, "/test/empty-frontmatter.md")
+
+				expect(result.content).toBe("Content after empty frontmatter")
+				expect(result.frontmatter).toEqual({})
+			}))
+
+		it("should test loadFileContent with frontmatter containing only comments", () =>
+			Effect.gen(function* () {
+				const contentWithCommentFrontmatter = "---\n# This is a comment\n# Another comment\n---\nContent"
+				const mockFs = {
+					readFileString: () => Effect.succeed(contentWithCommentFrontmatter),
+					stat: () => Effect.succeed({ type: "File" })
+				} as any
+
+				const result = yield* loadFileContent(mockFs, "/test/comment-frontmatter.md")
+
+				expect(result.content).toBe("Content")
+				expect(result.frontmatter).toEqual({})
+			}))
+
+		it("should test searchInContent with empty query string", () => {
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: "Some content here",
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "")
+
+			// Empty query should match all lines since empty string is included in any string
+			expect(results).toHaveLength(1)
+			expect(results[0].context).toBe("Some content here")
+		})
+
+		it("should test searchInContent context boundaries", () => {
+			const shortLine = "abc"
+			const vaultFile: VaultFile = {
+				path: "/test/file.md",
+				content: shortLine,
+				frontmatter: {},
+				bytes: 0,
+				lines: 1
+			}
+
+			const results = searchInContent(vaultFile, "b")
+
+			expect(results).toHaveLength(1)
+			// Context should be the entire line when it's shorter than the limit
+			expect(results[0].context).toBe(shortLine)
+		})
+
+		it("should test loadAllFiles with concurrency", () =>
+			Effect.gen(function* () {
+				let concurrentReads = 0
+				let maxConcurrentReads = 0
+
+				const mockFs = {
+					readDirectory: () => Effect.succeed(["file1.md", "file2.md", "file3.md"]),
+					stat: () => Effect.succeed({ type: "File" }),
+					readFileString: () =>
+						Effect.gen(function* () {
+							concurrentReads++
+							maxConcurrentReads = Math.max(maxConcurrentReads, concurrentReads)
+							yield* Effect.sleep(10) // Small delay to allow concurrency
+							concurrentReads--
+							return Effect.succeed("content")
+						})
+				} as any
+
+				const result = yield* loadAllFiles(mockFs, mockPath, "/vault")
+
+				expect(result.size).toBe(3)
+				expect(maxConcurrentReads).toBeGreaterThan(1) // Should demonstrate concurrency
+			}))
+	})
 })
