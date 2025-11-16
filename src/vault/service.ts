@@ -3,6 +3,7 @@ import { BunContext } from "@effect/platform-bun"
 import { Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { VaultConfig } from "../config/vault.js"
 import type { SearchResult } from "./api.js"
+import { parseFrontmatter, type VaultFile } from "./domain.js"
 
 export interface VaultMetrics {
 	totalFiles: number
@@ -45,14 +46,32 @@ const walkDirectory = (
 		return files
 	}).pipe(Effect.catchAll(() => Effect.succeed([])))
 
-const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Effect<string> =>
-	fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed("")))
+const loadFileContent = (fs: FileSystem.FileSystem, filePath: string): Effect.Effect<VaultFile> =>
+	fs.readFileString(filePath).pipe(
+		Effect.catchAll(() => Effect.succeed("")),
+		Effect.flatMap((content) =>
+			parseFrontmatter(content).pipe(
+				Effect.map(({ frontmatter, content: mainContent }) => ({
+					path: filePath,
+					content: mainContent,
+					frontmatter
+				}))
+			)
+		),
+		Effect.catchAll(() =>
+			Effect.succeed({
+				path: filePath,
+				content: "",
+				frontmatter: {}
+			})
+		)
+	)
 
 const loadAllFiles = (
 	fs: FileSystem.FileSystem,
 	path: Path.Path,
 	vaultPath: string
-): Effect.Effect<Map<string, string>> =>
+): Effect.Effect<Map<string, VaultFile>> =>
 	Effect.gen(function* () {
 		const files = yield* walkDirectory(fs, path, vaultPath)
 
@@ -61,8 +80,8 @@ const loadAllFiles = (
 			(filePath) =>
 				Effect.gen(function* () {
 					const relativePath = path.relative(vaultPath, filePath)
-					const content = yield* loadFileContent(fs, filePath)
-					return [relativePath, content] as const
+					const vaultFile = yield* loadFileContent(fs, filePath)
+					return [relativePath, vaultFile] as const
 				}),
 			{ concurrency: 10 }
 		)
@@ -70,8 +89,8 @@ const loadAllFiles = (
 		return new Map(fileContents)
 	})
 
-const searchInContent = (content: string, query: string, filePath: string): Array<SearchResult> => {
-	const lines = content.split("\n")
+const searchInContent = (vaultFile: VaultFile, query: string): Array<SearchResult> => {
+	const lines = vaultFile.content.split("\n")
 	const results: Array<SearchResult> = []
 	const lowerQuery = query.toLowerCase()
 
@@ -86,7 +105,7 @@ const searchInContent = (content: string, query: string, filePath: string): Arra
 			const context = line.slice(start, end)
 
 			results.push({
-				filePath,
+				filePath: vaultFile.path,
 				lineNumber: i + 1,
 				context
 			})
@@ -123,11 +142,11 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 				if (exists) {
 					const stat = yield* fs.stat(filePath)
 					if (stat.type === "File" && filePath.endsWith(".md")) {
-						const content = yield* loadFileContent(fs, filePath)
+						const vaultFile = yield* loadFileContent(fs, filePath)
 						const relativePath = path.relative(config.vaultPath, filePath)
 						yield* Ref.update(cacheRef, (cache) => {
 							const newCache = new Map(cache)
-							newCache.set(relativePath, content)
+							newCache.set(relativePath, vaultFile)
 							return newCache
 						})
 						yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
@@ -199,7 +218,8 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 			getFile: (relativePath: string) =>
 				Effect.gen(function* () {
 					const cache = yield* Ref.get(cacheRef)
-					return cache.get(relativePath)
+					const vaultFile = cache.get(relativePath)
+					return vaultFile?.content
 				}),
 
 			// HTTP-friendly getFile with error handling and filename normalization
@@ -215,20 +235,24 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 
 					// Get content from cache
 					const cache = yield* Ref.get(cacheRef)
-					const content = cache.get(normalizedFilename)
+					const vaultFile = cache.get(normalizedFilename)
 
 					// Convert undefined to NotFound error for API consistency
-					if (content === undefined) {
+					if (vaultFile === undefined) {
 						return yield* Effect.fail(new HttpApiError.NotFound())
 					}
 
-					return content
+					return vaultFile.content
 				}),
 
 			getAllFiles: () =>
 				Effect.gen(function* () {
 					const cache = yield* Ref.get(cacheRef)
-					return new Map(cache)
+					const stringMap = new Map<string, string>()
+					for (const [path, vaultFile] of cache.entries()) {
+						stringMap.set(path, vaultFile.content)
+					}
+					return stringMap
 				}),
 
 			searchInFiles: (query: string) =>
@@ -239,28 +263,12 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 
 					const cache = yield* Ref.get(cacheRef)
 					const results: Array<SearchResult> = []
-					const lowerQuery = query.toLowerCase()
 
 					// Optimized sequential search with pre-lowercased query
-					for (const [filePath, content] of cache.entries()) {
-						const lines = content.split("\n")
-
-						for (let i = 0; i < lines.length; i++) {
-							const line = lines[i]
-							const lowerLine = line.toLowerCase()
-
-							if (lowerLine.includes(lowerQuery)) {
-								const matchIndex = lowerLine.indexOf(lowerQuery)
-								const start = Math.max(0, matchIndex - 100)
-								const end = Math.min(line.length, matchIndex + query.length + 100)
-								const context = line.slice(start, end)
-
-								results.push({
-									filePath,
-									lineNumber: i + 1,
-									context
-								})
-							}
+					for (const [, vaultFile] of cache.entries()) {
+						const fileResults = searchInContent(vaultFile, query)
+						for (const result of fileResults) {
+							results.push(result)
 						}
 					}
 
@@ -289,9 +297,9 @@ export class VaultService extends Effect.Service<VaultService>()("VaultService",
 					let largest = { path: "", bytes: 0 }
 					let smallest = { path: "", bytes: Number.MAX_SAFE_INTEGER }
 
-					for (const [path, content] of files.entries()) {
-						const bytes = new TextEncoder().encode(content).length
-						const lines = content.split("\n").length
+					for (const [path, vaultFile] of files.entries()) {
+						const bytes = new TextEncoder().encode(vaultFile.content).length
+						const lines = vaultFile.content.split("\n").length
 
 						totalBytes += bytes
 						totalLines += lines
@@ -341,7 +349,8 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
 				}
 				const results: Array<SearchResult> = []
 				for (const [filePath, content] of cache.entries()) {
-					const fileResults = searchInContent(content, query, filePath)
+					const vaultFile = { path: filePath, content, frontmatter: {} }
+					const fileResults = searchInContent(vaultFile, query)
 					for (const result of fileResults) {
 						results.push(result)
 					}
