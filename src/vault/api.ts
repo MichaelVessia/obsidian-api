@@ -1,5 +1,6 @@
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema } from '@effect/platform'
 import { Schema } from 'effect'
+import { VaultMetrics } from './domain.js'
 
 export const SearchResult = Schema.Struct({
   filePath: Schema.String,
@@ -64,22 +65,5 @@ export const vaultGroup = HttpApiGroup.make('Vault')
       }),
     ),
   )
-  .add(
-    HttpApiEndpoint.get('metrics', '/vault/metrics').addSuccess(
-      Schema.Struct({
-        totalFiles: Schema.Number,
-        totalBytes: Schema.Number,
-        totalLines: Schema.Number,
-        averageFileSize: Schema.Number,
-        largestFile: Schema.Struct({
-          path: Schema.String,
-          bytes: Schema.Number,
-        }),
-        smallestFile: Schema.Struct({
-          path: Schema.String,
-          bytes: Schema.Number,
-        }),
-      }),
-    ),
-  )
+  .add(HttpApiEndpoint.get('metrics', '/vault/metrics').addSuccess(VaultMetrics))
   .add(HttpApiEndpoint.get('search')`/vault/search/simple/${queryParam}`.addSuccess(SearchResults))

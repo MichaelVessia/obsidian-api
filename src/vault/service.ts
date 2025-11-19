@@ -3,17 +3,9 @@ import { BunContext } from '@effect/platform-bun'
 import { Effect, Fiber, Layer, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
+import type { VaultMetrics } from './domain.js'
 import { parseFrontmatter } from './domain.js'
 import { searchInContent } from './functions.js'
-
-export interface VaultMetrics {
-  totalFiles: number
-  totalBytes: number
-  totalLines: number
-  averageFileSize: number
-  largestFile: { path: string; bytes: number }
-  smallestFile: { path: string; bytes: number }
-}
 
 export class VaultService extends Effect.Service<VaultService>()('VaultService', {
   scoped: Effect.gen(function* () {
