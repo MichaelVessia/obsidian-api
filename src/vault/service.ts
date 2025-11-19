@@ -122,8 +122,8 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       Effect.ignore,
     )
 
-    // Track pending updates to debounce rapid changes
-    const pendingUpdates = new Map<string, NodeJS.Timeout>()
+    // Effect-managed debounced file updates
+    const debouncedUpdates = yield* Ref.make(new Map<string, Fiber.RuntimeFiber<void>>())
 
     const updateFile = (filePath: string) =>
       Effect.gen(function* () {
@@ -206,21 +206,35 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }),
       )
 
-    const scheduleUpdate = (filePath: string): void => {
-      // Clear existing timeout for this file
-      const existing = pendingUpdates.get(filePath)
-      if (existing) {
-        clearTimeout(existing)
-      }
+    const scheduleUpdate = (filePath: string) =>
+      Effect.gen(function* () {
+        // Cancel existing update for this file
+        const existing = yield* Ref.get(debouncedUpdates)
+        const existingFiber = existing.get(filePath)
+        if (existingFiber) {
+          yield* Fiber.interrupt(existingFiber)
+        }
 
-      // Schedule debounced update
-      const timeout = setTimeout(() => {
-        pendingUpdates.delete(filePath)
-        Effect.runPromise(updateFile(filePath))
-      }, config.debounceMs)
+        // Schedule new debounced update
+        const fiber = yield* Effect.fork(
+          Effect.sleep(config.debounceMs).pipe(
+            Effect.andThen(() => updateFile(filePath)),
+            Effect.ensuring(
+              Ref.update(debouncedUpdates, (updates) => {
+                const newUpdates = new Map(updates)
+                newUpdates.delete(filePath)
+                return newUpdates
+              }),
+            ),
+          ),
+        )
 
-      pendingUpdates.set(filePath, timeout)
-    }
+        yield* Ref.update(debouncedUpdates, (updates) => {
+          const newUpdates = new Map(updates)
+          newUpdates.set(filePath, fiber)
+          return newUpdates
+        })
+      })
 
     // Set up file watcher using Effect's FileSystem API with acquireRelease
     yield* Effect.acquireRelease(
@@ -228,9 +242,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         const fiber = yield* Effect.fork(
           fs.watch(config.vaultPath, { recursive: true }).pipe(
             Stream.runForEach((event) =>
-              Effect.sync(() => {
+              Effect.gen(function* () {
                 if (event.path.endsWith('.md')) {
-                  scheduleUpdate(event.path)
+                  yield* scheduleUpdate(event.path)
                 }
               }),
             ),
@@ -245,11 +259,11 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       (fiber) =>
         Effect.gen(function* () {
           yield* Fiber.interrupt(fiber)
-          // Clear any pending timeouts
-          for (const timeout of pendingUpdates.values()) {
-            clearTimeout(timeout)
-          }
-          pendingUpdates.clear()
+          // Cancel all pending debounced updates
+          const pending = yield* Ref.get(debouncedUpdates)
+          yield* Effect.forEach(Array.from(pending.values()), (pendingFiber) => Fiber.interrupt(pendingFiber), {
+            concurrency: 'unbounded',
+          })
         }),
     )
 
