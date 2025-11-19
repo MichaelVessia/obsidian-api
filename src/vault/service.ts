@@ -391,17 +391,20 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
 // Test helper - create mock dependencies for testing
 export const VaultServiceTest = (cache: Map<string, string>) =>
-  Layer.mergeAll(
-    Layer.succeed(VaultConfig, { vaultPath: '/test', debounceMs: 100 }),
-    Layer.succeed(FileSystem.FileSystem, {
-      readDirectory: () => Effect.succeed([]),
-      readFileString: (path: string) => Effect.succeed(cache.get(path) || ''),
-      stat: () => Effect.succeed({ type: 'File' as const }),
-      exists: (path: string) => Effect.succeed(cache.has(path)),
-      watch: () => Stream.empty,
-    } as any),
-    Layer.succeed(Path.Path, {
-      join: (...parts: string[]) => parts.join('/'),
-      relative: (from: string, to: string) => to,
-    } as any),
-  )
+  Layer.mergeAll(TestVaultConfig, TestFileSystem(cache), TestPath).pipe(Layer.provide(BunContext.layer))
+
+const TestVaultConfig = Layer.succeed(VaultConfig, { vaultPath: '/test', debounceMs: 100 })
+
+const TestFileSystem = (cache: Map<string, string>) =>
+  Layer.succeed(FileSystem.FileSystem, {
+    readDirectory: () => Effect.succeed([]),
+    readFileString: (path: string) => Effect.succeed(cache.get(path) || ''),
+    stat: () => Effect.succeed({ type: 'File' as const }),
+    exists: (path: string) => Effect.succeed(cache.has(path)),
+    watch: () => Stream.empty,
+  } as any)
+
+const TestPath = Layer.succeed(Path.Path, {
+  join: (...parts: string[]) => parts.join('/'),
+  relative: (_from: string, to: string) => to,
+} as any)
