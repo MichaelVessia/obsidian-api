@@ -41,19 +41,22 @@ Ensure typecheck, lint, format, and tests all pass after changes.
 
 ### Medium Priority
 
-#### 6. Convert getFile method to use Option.fromNullable
+#### 6. ✅ Convert getFile method to use Option.fromNullable
 **Location:** Lines 212-217
 **Current:** Returns `vaultFile?.content` (potentially undefined)
 **Improvement:** Use `Option.fromNullable(cache.get(relativePath))` and map to content for type-safe optional handling
+**Status:** COMPLETED - Updated getFile to return Option<string> and updated all tests to handle Option
 
-#### 7. Replace catchAll with Effect.matchEffect in updateFile error handling
+#### 7. ✅ Replace catchAll with Effect.matchEffect in updateFile error handling
 **Location:** Line 164
 **Current:** `Effect.catchAll(() => Effect.void)`
 **Improvement:** Use `Effect.matchEffect` to log update errors before returning void
+**Status:** COMPLETED - Updated updateFile and all remaining catchAll patterns with Effect.matchEffect
 
-#### 8. Update VaultServiceTest to match new error handling patterns
+#### 8. ✅ Update VaultServiceTest to match new error handling patterns
 **Location:** VaultServiceTest function
 **Improvement:** Update test implementations to use Option and match new error handling patterns
+**Status:** COMPLETED - VaultServiceTest already updated with Option support and all error handling patterns are now consistent
 
 ## Idiomatic Patterns to Apply
 
