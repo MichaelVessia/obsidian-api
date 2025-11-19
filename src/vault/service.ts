@@ -15,36 +15,39 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
     // Helper function to load all files
     const loadAllFiles = Effect.gen(function* () {
-      const walkDirectory = (dirPath: string): Effect.Effect<Array<string>> =>
-        Effect.gen(function* () {
-          const entries = yield* fs.readDirectory(dirPath)
-          const files: Array<string> = []
+      const walkDirectory = Effect.fn('vault.walkDirectory', {
+        attributes: { dirPath: (dirPath: string) => dirPath },
+      })(
+        (dirPath: string): Effect.Effect<Array<string>> =>
+          Effect.gen(function* () {
+            const entries = yield* fs.readDirectory(dirPath)
+            const results = yield* Effect.forEach(
+              entries,
+              (entry) =>
+                Effect.gen(function* () {
+                  // Skip hidden directories (starting with .) before stat call
+                  if (entry.startsWith('.')) {
+                    return [] as string[]
+                  }
 
-          for (const entry of entries) {
-            // Skip ignored directories
-            if (['.obsidian'].some((pattern) => entry.includes(pattern))) {
-              continue
-            }
+                  const fullPath = path.join(dirPath, entry)
+                  const stat = yield* fs.stat(fullPath)
 
-            const fullPath = path.join(dirPath, entry)
-            const stat = yield* fs.stat(fullPath)
+                  if (stat.type === 'Directory') {
+                    return yield* walkDirectory(fullPath)
+                  } else if (stat.type === 'File' && entry.endsWith('.md')) {
+                    return [fullPath]
+                  }
+                  return [] as string[]
+                }),
+              { concurrency: 4 },
+            )
 
-            if (stat.type === 'Directory') {
-              const subFiles = yield* walkDirectory(fullPath)
-              files.push(...subFiles)
-            } else if (stat.type === 'File' && entry.endsWith('.md')) {
-              files.push(fullPath)
-            }
-          }
-
-          return files
-        }).pipe(Effect.catchAll(() => Effect.succeed([])))
-
-      const files = yield* walkDirectory(config.vaultPath).pipe(
-        Effect.withSpan('vault.walkDirectory', {
-          attributes: { dirPath: config.vaultPath },
-        }),
+            return results.flat()
+          }).pipe(Effect.catchAll(() => Effect.succeed([]))),
       )
+
+      const files = yield* walkDirectory(config.vaultPath)
 
       const fileContents = yield* Effect.forEach(
         files,
@@ -80,7 +83,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             )
             return [relativePath, vaultFile] as const
           }),
-        { concurrency: 10 },
+        { concurrency: 8 },
       )
 
       return new Map(fileContents)
