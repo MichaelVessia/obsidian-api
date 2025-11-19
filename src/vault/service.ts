@@ -157,15 +157,19 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                 lines,
               }
             }).pipe(
-              Effect.catchAll(() =>
-                Effect.succeed({
-                  path: filePath,
-                  content: '',
-                  frontmatter: {},
-                  bytes: 0,
-                  lines: 0,
-                }),
-              ),
+              Effect.matchEffect({
+                onFailure: (error) =>
+                  Effect.logWarning(`Failed to update file: ${filePath}`, error).pipe(
+                    Effect.as({
+                      path: filePath,
+                      content: '',
+                      frontmatter: {},
+                      bytes: 0,
+                      lines: 0,
+                    }),
+                  ),
+                onSuccess: Effect.succeed,
+              }),
             )
             const relativePath = path.relative(config.vaultPath, filePath)
             yield* Ref.update(cacheRef, (cache) => {
