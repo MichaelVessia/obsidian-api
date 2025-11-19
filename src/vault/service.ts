@@ -89,15 +89,19 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                 lines,
               }
             }).pipe(
-              Effect.catchAll(() =>
-                Effect.succeed({
-                  path: filePath,
-                  content: '',
-                  frontmatter: {},
-                  bytes: 0,
-                  lines: 0,
-                }),
-              ),
+              Effect.matchEffect({
+                onFailure: (error) =>
+                  Effect.logWarning(`Failed to load file: ${filePath}`, error).pipe(
+                    Effect.as({
+                      path: filePath,
+                      content: '',
+                      frontmatter: {},
+                      bytes: 0,
+                      lines: 0,
+                    }),
+                  ),
+                onSuccess: Effect.succeed,
+              }),
             )
             return [relativePath, vaultFile] as const
           }),
@@ -195,7 +199,12 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             Effect.ignore,
           )
         }
-      }).pipe(Effect.catchAll(() => Effect.void))
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) => Effect.logWarning(`File watcher error`, error).pipe(Effect.as(void 0)),
+          onSuccess: () => Effect.void,
+        }),
+      )
 
     const scheduleUpdate = (filePath: string): void => {
       // Clear existing timeout for this file
