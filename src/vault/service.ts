@@ -55,7 +55,13 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           Effect.gen(function* () {
             const relativePath = path.relative(config.vaultPath, filePath)
             const vaultFile = yield* Effect.gen(function* () {
-              const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed('')))
+              const content = yield* fs
+                .readFileString(filePath)
+                .pipe(
+                  Effect.catchAll((error) =>
+                    Effect.logWarning(`Failed to read file: ${filePath}`, error).pipe(Effect.as('')),
+                  ),
+                )
               const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
                 Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })),
               )
@@ -111,7 +117,13 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           const stat = yield* fs.stat(filePath)
           if (stat.type === 'File' && filePath.endsWith('.md')) {
             const vaultFile = yield* Effect.gen(function* () {
-              const content = yield* fs.readFileString(filePath).pipe(Effect.catchAll(() => Effect.succeed('')))
+              const content = yield* fs
+                .readFileString(filePath)
+                .pipe(
+                  Effect.catchAll((error) =>
+                    Effect.logWarning(`Failed to read file: ${filePath}`, error).pipe(Effect.as('')),
+                  ),
+                )
               const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
                 Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })),
               )
