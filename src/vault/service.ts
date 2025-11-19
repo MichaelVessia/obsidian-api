@@ -389,88 +389,19 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
   dependencies: [BunContext.layer],
 }) {}
 
+// Test helper - create mock dependencies for testing
 export const VaultServiceTest = (cache: Map<string, string>) =>
-  Layer.succeed(
-    VaultService,
-    VaultService.make({
-      getFile: (relativePath: string) => Effect.succeed(Option.fromNullable(cache.get(relativePath))),
-      getFileContent: (filename: string) => {
-        if (!filename || filename.trim() === '') {
-          return Effect.fail(new HttpApiError.BadRequest())
-        }
-        const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
-        const content = cache.get(normalizedFilename)
-        if (content === undefined) {
-          return Effect.fail(new HttpApiError.NotFound())
-        }
-        return Effect.succeed(content)
-      },
-      getAllFiles: () => Effect.succeed(new Map(cache)),
-      searchInFiles: (query: string) => {
-        if (!query || query.trim() === '') {
-          return Effect.succeed([])
-        }
-        const results: Array<SearchResult> = []
-        for (const [filePath, content] of cache.entries()) {
-          const bytes = new TextEncoder().encode(content).length
-          const lines = content.split('\n').length
-          const vaultFile = {
-            path: filePath,
-            content,
-            frontmatter: {},
-            bytes,
-            lines,
-          }
-          const fileResults = searchInContent(vaultFile, query)
-          for (const result of fileResults) {
-            results.push(result)
-          }
-        }
-        return Effect.succeed(results)
-      },
-      reload: () => Effect.void,
-      getMetrics: (): Effect.Effect<VaultMetrics> => {
-        let totalBytes = 0
-        let totalLines = 0
-        let largest = { path: '', bytes: 0 }
-        let smallest = { path: '', bytes: Number.MAX_SAFE_INTEGER }
-
-        for (const [path, content] of cache.entries()) {
-          const bytes = new TextEncoder().encode(content).length
-          const lines = content.split('\n').length
-
-          totalBytes += bytes
-          totalLines += lines
-
-          if (bytes > largest.bytes) {
-            largest = { path, bytes }
-          }
-          if (bytes < smallest.bytes) {
-            smallest = { path, bytes }
-          }
-        }
-
-        return Effect.succeed({
-          totalFiles: cache.size,
-          totalBytes,
-          totalLines,
-          averageFileSize: cache.size > 0 ? Math.round(totalBytes / cache.size) : 0,
-          largestFile: largest.path ? largest : { path: 'none', bytes: 0 },
-          smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
-        })
-      },
-      getFilePaths: (limit: number, offset: number) =>
-        Effect.gen(function* () {
-          const allPaths = Array.from(cache.keys())
-          const total = allPaths.length
-
-          const files = yield* Stream.fromIterable(allPaths).pipe(
-            Stream.drop(offset),
-            Stream.take(limit),
-            Stream.runCollect,
-          )
-
-          return { files: Array.from(files), total }
-        }),
-    }),
+  Layer.mergeAll(
+    Layer.succeed(VaultConfig, { vaultPath: '/test', debounceMs: 100 }),
+    Layer.succeed(FileSystem.FileSystem, {
+      readDirectory: () => Effect.succeed([]),
+      readFileString: (path: string) => Effect.succeed(cache.get(path) || ''),
+      stat: () => Effect.succeed({ type: 'File' as const }),
+      exists: (path: string) => Effect.succeed(cache.has(path)),
+      watch: () => Stream.empty,
+    } as any),
+    Layer.succeed(Path.Path, {
+      join: (...parts: string[]) => parts.join('/'),
+      relative: (from: string, to: string) => to,
+    } as any),
   )
