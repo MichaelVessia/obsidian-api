@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { Effect } from 'effect'
+import { Effect, Option } from 'effect'
 import { VaultService, VaultServiceTest } from './service.js'
 import { searchInContent } from './functions.js'
 import type { VaultFile } from './domain.js'
@@ -15,18 +15,19 @@ describe('VaultService', () => {
       const service = yield* VaultService
       const content = yield* service.getFile('test.md')
 
-      expect(content).toBe('# Test File\nSome content')
+      expect(Option.isSome(content)).toBe(true)
+      expect(Option.getOrNull(content)).toBe('# Test File\nSome content')
     }).pipe(Effect.provide(VaultServiceTest(cache)))
   })
 
-  it('should return undefined for non-existent file', () => {
+  it('should return None for non-existent file', () => {
     const cache = new Map([['test.md', 'content']])
 
     return Effect.gen(function* () {
       const service = yield* VaultService
       const content = yield* service.getFile('missing.md')
 
-      expect(content).toBeUndefined()
+      expect(Option.isNone(content)).toBe(true)
     }).pipe(Effect.provide(VaultServiceTest(cache)))
   })
 
@@ -224,7 +225,8 @@ describe('VaultService', () => {
 
         // After reload, should still work with test cache
         const content = yield* service.getFile('test.md')
-        expect(content).toBe('original content')
+        expect(Option.isSome(content)).toBe(true)
+        expect(Option.getOrNull(content)).toBe('original content')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
   })
@@ -400,7 +402,8 @@ describe('VaultService', () => {
         const content = yield* service.getFile('test.md')
 
         // This tests the internal loadFileContent function indirectly
-        expect(content).toBe('# Frontmatter\ntitle: Test\n\nContent here')
+        expect(Option.isSome(content)).toBe(true)
+        expect(Option.getOrNull(content)).toBe('# Frontmatter\ntitle: Test\n\nContent here')
       }).pipe(Effect.provide(VaultServiceTest(cache)))
     })
 

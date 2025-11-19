@@ -1,6 +1,6 @@
 import { FileSystem, HttpApiError, Path } from '@effect/platform'
 import { BunContext } from '@effect/platform-bun'
-import { Effect, Fiber, Layer, Ref, Stream } from 'effect'
+import { Effect, Fiber, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
 import type { VaultMetrics } from './domain.js'
@@ -242,8 +242,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       getFile: (relativePath: string) =>
         Effect.gen(function* () {
           const cache = yield* Ref.get(cacheRef)
-          const vaultFile = cache.get(relativePath)
-          return vaultFile?.content
+          return Option.fromNullable(cache.get(relativePath)).pipe(Option.map((vaultFile) => vaultFile.content))
         }),
 
       // HTTP-friendly getFile with error handling and filename normalization
@@ -365,7 +364,7 @@ export const VaultServiceTest = (cache: Map<string, string>) =>
   Layer.succeed(
     VaultService,
     VaultService.make({
-      getFile: (relativePath: string) => Effect.succeed(cache.get(relativePath)),
+      getFile: (relativePath: string) => Effect.succeed(Option.fromNullable(cache.get(relativePath))),
       getFileContent: (filename: string) => {
         if (!filename || filename.trim() === '') {
           return Effect.fail(new HttpApiError.BadRequest())
