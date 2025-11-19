@@ -44,7 +44,13 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             )
 
             return results.flat()
-          }).pipe(Effect.catchAll(() => Effect.succeed([]))),
+          }).pipe(
+            Effect.matchEffect({
+              onFailure: (error) =>
+                Effect.logWarning(`Failed to walk directory: ${dirPath}`, error).pipe(Effect.as([])),
+              onSuccess: Effect.succeed,
+            }),
+          ),
       )
 
       const files = yield* walkDirectory(config.vaultPath)
@@ -63,7 +69,13 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                   ),
                 )
               const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
-                Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })),
+                Effect.matchEffect({
+                  onFailure: (error) =>
+                    Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error).pipe(
+                      Effect.as({ frontmatter: {}, content }),
+                    ),
+                  onSuccess: Effect.succeed,
+                }),
               )
 
               const bytes = new TextEncoder().encode(mainContent).length
@@ -125,7 +137,13 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                   ),
                 )
               const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
-                Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })),
+                Effect.matchEffect({
+                  onFailure: (error) =>
+                    Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error).pipe(
+                      Effect.as({ frontmatter: {}, content }),
+                    ),
+                  onSuccess: Effect.succeed,
+                }),
               )
 
               const bytes = new TextEncoder().encode(mainContent).length
