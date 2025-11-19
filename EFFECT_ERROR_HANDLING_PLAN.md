@@ -19,21 +19,25 @@ Make error handling in `src/vault/service.ts` more Effect-idiomatic by replacing
 **Improvement:** Use `Effect.matchEffect` to log read errors before returning empty string fallback
 **Status:** COMPLETED - Used Effect.catchAll with logging via Effect.logWarning and Effect.as('')
 
-#### 2. Replace catchAll with Effect.matchEffect in frontmatter parsing  
+#### 2. ✅ Replace catchAll with Effect.matchEffect in frontmatter parsing  
 **Location:** Lines 59-60, 115-116
 **Current:** `parseFrontmatter(content).pipe(Effect.catchAll(() => Effect.succeed({ frontmatter: {}, content })))`
 **Improvement:** Use `Effect.matchEffect` to log parsing errors before returning fallback object
+**Status:** COMPLETED - Used Effect.matchEffect with logging via Effect.logWarning and Effect.as({ frontmatter: {}, content })
 
-#### 3. Replace catchAll with Effect.matchEffect in directory walking
+#### 3. ✅ Replace catchAll with Effect.matchEffect in directory walking
 **Location:** Line 47
 **Current:** `Effect.catchAll(() => Effect.succeed([]))`
 **Improvement:** Use `Effect.matchEffect` to log directory walk errors before returning empty array
+**Status:** COMPLETED - Used Effect.matchEffect with logging via Effect.logWarning and Effect.as([])
 
-#### 4. Run tests to ensure all changes work correctly
+#### 4. ✅ Run tests to ensure all changes work correctly
 Verify that the refactored error handling doesn't break existing functionality.
+**Status:** COMPLETED - All 80 tests pass
 
-#### 5. Run bun run check for full verification
+#### 5. ✅ Run bun run check for full verification
 Ensure typecheck, lint, format, and tests all pass after changes.
+**Status:** COMPLETED - Typecheck, lint, format, and tests all pass
 
 ### Medium Priority
 
