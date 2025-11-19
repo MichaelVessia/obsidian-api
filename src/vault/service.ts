@@ -222,33 +222,35 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       pendingUpdates.set(filePath, timeout)
     }
 
-    // Set up file watcher using Effect's FileSystem API
-    const watchFiber = yield* Effect.fork(
-      fs.watch(config.vaultPath, { recursive: true }).pipe(
-        Stream.runForEach((event) =>
-          Effect.sync(() => {
-            if (event.path.endsWith('.md')) {
-              scheduleUpdate(event.path)
-            }
-          }),
-        ),
-      ),
-    )
-    yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
-      Effect.annotateLogs({ vaultPath: config.vaultPath }),
-      Effect.ignore,
-    )
-
-    // Cleanup watcher on scope release
-    yield* Effect.addFinalizer(() =>
+    // Set up file watcher using Effect's FileSystem API with acquireRelease
+    yield* Effect.acquireRelease(
       Effect.gen(function* () {
-        yield* Fiber.interrupt(watchFiber)
-        // Clear any pending timeouts
-        for (const timeout of pendingUpdates.values()) {
-          clearTimeout(timeout)
-        }
-        pendingUpdates.clear()
+        const fiber = yield* Effect.fork(
+          fs.watch(config.vaultPath, { recursive: true }).pipe(
+            Stream.runForEach((event) =>
+              Effect.sync(() => {
+                if (event.path.endsWith('.md')) {
+                  scheduleUpdate(event.path)
+                }
+              }),
+            ),
+          ),
+        )
+        yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
+          Effect.annotateLogs({ vaultPath: config.vaultPath }),
+          Effect.ignore,
+        )
+        return fiber
       }),
+      (fiber) =>
+        Effect.gen(function* () {
+          yield* Fiber.interrupt(fiber)
+          // Clear any pending timeouts
+          for (const timeout of pendingUpdates.values()) {
+            clearTimeout(timeout)
+          }
+          pendingUpdates.clear()
+        }),
     )
 
     return {
