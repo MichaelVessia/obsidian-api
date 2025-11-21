@@ -17,16 +17,7 @@ const getFileHandler = Effect.fn('vault.getFile', { attributes: { filename: (fil
   },
 )
 
-const listFilesHandler = Effect.fn('vault.listFiles', {
-  attributes: {
-    limit: (args: [number, number]) => args[0],
-    offset: (args: [number, number]) => args[1],
-    returned: (_: [number, number], result: { files: string[]; total: number; offset: number; limit: number }) =>
-      result.files.length,
-    total: (_: [number, number], result: { files: string[]; total: number; offset: number; limit: number }) =>
-      result.total,
-  },
-})(function* (limit: number, offset: number) {
+const listFilesHandler = Effect.fn('vault.listFiles')(function* (limit: number, offset: number) {
   const vault = yield* VaultService
   const result = yield* vault.getFilePaths(limit, offset)
   return {
@@ -37,11 +28,7 @@ const listFilesHandler = Effect.fn('vault.listFiles', {
   }
 })
 
-const reloadHandler = Effect.fn('vault.reload', {
-  attributes: {
-    filesLoaded: (_: undefined, result: { message: string; filesLoaded: number }) => result.filesLoaded,
-  },
-})(function* () {
+const reloadHandler = Effect.fn('vault.reload')(function* () {
   const vault = yield* VaultService
   yield* vault.reload()
   const files = yield* vault.getAllFiles()
@@ -56,12 +43,9 @@ const metricsHandler = Effect.fn('vault.metrics')(function* () {
   return yield* service.getMetrics()
 })
 
-const searchHandler = Effect.fn('vault.search', {
-  attributes: {
-    query: (query: string) => query,
-    resultCount: (_query: string, results: unknown[]) => results.length,
-  },
-})(function* (query: string) {
+const searchHandler = Effect.fn('vault.search', { attributes: { query: (query: string) => query } })(function* (
+  query: string,
+) {
   const service = yield* VaultService
   return yield* service.searchInFiles(query)
 })
