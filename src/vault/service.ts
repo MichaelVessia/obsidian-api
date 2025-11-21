@@ -104,10 +104,22 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         Effect.gen(function* () {
           const files = yield* getCacheWithFallback(cacheRef, 'getMetrics')
 
+          // Return early with default metrics for empty vault
+          if (files.size === 0) {
+            return {
+              totalFiles: 0,
+              totalBytes: 0,
+              totalLines: 0,
+              averageFileSize: 0,
+              largestFile: { path: 'none', bytes: 0 },
+              smallestFile: { path: 'none', bytes: 0 },
+            }
+          }
+
           let totalBytes = 0
           let totalLines = 0
           let largest = { path: '', bytes: 0 }
-          let smallest = { path: '', bytes: Number.MAX_SAFE_INTEGER }
+          let smallest = { path: '', bytes: Number.POSITIVE_INFINITY }
 
           for (const [path, vaultFile] of files.entries()) {
             totalBytes += vaultFile.bytes
@@ -125,9 +137,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             totalFiles: files.size,
             totalBytes,
             totalLines,
-            averageFileSize: files.size > 0 ? Math.round(totalBytes / files.size) : 0,
-            largestFile: largest.path ? largest : { path: 'none', bytes: 0 },
-            smallestFile: smallest.path ? smallest : { path: 'none', bytes: 0 },
+            averageFileSize: Math.round(totalBytes / files.size),
+            largestFile: largest,
+            smallestFile: smallest,
           }
         }),
 
