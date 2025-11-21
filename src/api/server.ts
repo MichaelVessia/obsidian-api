@@ -3,6 +3,7 @@ import { BunHttpServer } from '@effect/platform-bun'
 import { Effect, Layer } from 'effect'
 import { VaultConfigLive } from '../config/vault.js'
 import { vaultGroup } from '../vault/api.js'
+import { CacheManager } from '../vault/cache-manager.js'
 import { FileLoader } from '../vault/file-loader.js'
 import { VaultService } from '../vault/service.js'
 import { TracerLayer } from '../tracing/index.js'
@@ -69,6 +70,7 @@ const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(
   Layer.provide(vaultHandlers),
   Layer.provide(VaultService.Default),
+  Layer.provide(CacheManager.Default),
   Layer.provide(FileLoader.Default),
   Layer.provide(VaultConfigLive),
 )
