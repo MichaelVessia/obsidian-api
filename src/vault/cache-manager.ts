@@ -55,7 +55,7 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
                     newCache.set(relativePath, vaultFile)
                     return newCache
                   })
-                  yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
+                  yield* Effect.logInfo(`File updated: ${relativePath}`).pipe(
                     Effect.annotateLogs({ filePath: relativePath }),
                   )
                 }),
@@ -70,7 +70,7 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
             newCache.delete(relativePath)
             return newCache
           })
-          yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(Effect.annotateLogs({ filePath: relativePath }))
+          yield* Effect.logInfo(`File deleted: ${relativePath}`).pipe(Effect.annotateLogs({ filePath: relativePath }))
         }
       }).pipe(
         Effect.catchAll((error) => {
