@@ -66,11 +66,11 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
 
     // Load all files from vault
     const loadAllFiles = Effect.gen(function* () {
-      const walkDirectory = Effect.fn('vault.walkDirectory', {
-        attributes: { dirPath: (dirPath: string) => dirPath },
-      })(
+      const walkDirectory = Effect.fn('vault.walkDirectory')(
         (dirPath: string): Effect.Effect<Array<string>, DirectoryReadError> =>
           Effect.gen(function* () {
+            yield* Effect.annotateCurrentSpan('dirPath', dirPath)
+
             const entries = yield* fs.readDirectory(dirPath).pipe(
               Effect.mapError(
                 (error) =>
@@ -117,7 +117,9 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
               { concurrency: 'unbounded' },
             )
 
-            return results.flat()
+            const flatResults = results.flat()
+            yield* Effect.annotateCurrentSpan('fileCount', flatResults.length)
+            return flatResults
           }),
       )
 
