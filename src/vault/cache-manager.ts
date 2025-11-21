@@ -2,6 +2,7 @@ import { FileSystem, Path } from '@effect/platform'
 import { Effect, Fiber, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { VaultFile } from './domain.js'
+import { StatError } from './domain.js'
 import { FileLoader } from './file-loader.js'
 
 export interface CacheManagerType {
@@ -35,7 +36,14 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
         const exists = yield* fs.exists(filePath)
 
         if (exists) {
-          const stat = yield* fs.stat(filePath).pipe(
+          const statResult = yield* fs.stat(filePath).pipe(
+            Effect.mapError(
+              (error) =>
+                new StatError({
+                  filePath,
+                  cause: error,
+                }),
+            ),
             Effect.catchAll((error) =>
               Effect.gen(function* () {
                 yield* Effect.logWarning(`Failed to stat file: ${filePath}`, error)
@@ -44,7 +52,7 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
             ),
           )
 
-          if (stat?.type === 'File' && filePath.endsWith('.md')) {
+          if (statResult?.type === 'File' && filePath.endsWith('.md')) {
             yield* fileLoader.loadFile(filePath).pipe(
               Effect.andThen(([relativePath, vaultFile]) =>
                 Effect.gen(function* () {
@@ -58,7 +66,11 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
                   )
                 }),
               ),
-              Effect.catchAll((error) => Effect.logWarning(`Failed to update file: ${filePath}`, error)),
+              Effect.catchAll((error) =>
+                Effect.gen(function* () {
+                  yield* Effect.logWarning(`Failed to update file: ${filePath}`, error)
+                }),
+              ),
             )
           }
         } else {
@@ -71,7 +83,13 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
           })
           yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(Effect.annotateLogs({ filePath: relativePath }))
         }
-      }).pipe(Effect.catchAll((error) => Effect.logWarning(`File watcher error`, error)))
+      }).pipe(
+        Effect.catchAll((error) =>
+          Effect.gen(function* () {
+            yield* Effect.logWarning(`Cache update error`, error)
+          }),
+        ),
+      )
 
     // Schedule debounced update for a file
     const scheduleUpdate = (filePath: string) =>

@@ -26,6 +26,16 @@ export class FileWatcherError extends Data.TaggedError('FileWatcherError')<{
   readonly cause: unknown
 }> {}
 
+export class StatError extends Data.TaggedError('StatError')<{
+  readonly filePath: string
+  readonly cause: unknown
+}> {}
+
+export class CacheUpdateError extends Data.TaggedError('CacheUpdateError')<{
+  readonly filePath: string
+  readonly cause: unknown
+}> {}
+
 export const Frontmatter = Schema.Record({
   key: Schema.String,
   value: Schema.Union(Schema.String, Schema.Number, Schema.Boolean, Schema.Array(Schema.String)),

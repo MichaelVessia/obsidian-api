@@ -302,7 +302,6 @@ describe('CacheManager', () => {
     it('should allow updates in large cache without corruption', () =>
       Effect.gen(function* () {
         const cacheManager = yield* CacheManager
-        const cache = yield* Ref.get(cacheManager.cacheRef)
 
         // Update middle file
         const middleFile = 'file500.md'
