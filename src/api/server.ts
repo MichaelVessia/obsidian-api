@@ -91,7 +91,7 @@ const searchByFolderHandler = Effect.fn('vault.searchByFolder')(function* (folde
 const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
   handlers
     .handle('getFile', ({ path: { filename } }) => getFileHandler(filename))
-    .handle('listFiles', () => listFilesHandler(50, 0))
+    .handle('listFiles', ({ urlParams: { limit, offset } }) => listFilesHandler(limit, offset))
     .handle('reload', () => reloadHandler())
     .handle('metrics', () => metricsHandler())
     .handle('search', ({ path: { query } }) => searchHandler(query))
