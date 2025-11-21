@@ -4,7 +4,7 @@ import { Effect, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
 import type { VaultFile, VaultMetrics } from './domain.js'
-import { CacheManager } from './cache-manager.js'
+import { CacheManager, type CacheManagerType } from './cache-manager.js'
 import { searchInContent } from './search.functions.js'
 
 // Helper to safely access cache, returning empty map on error with logging
@@ -169,8 +169,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
         const cache = yield* getCacheWithFallback(cacheRef, `searchByFolder(${folderPath})`)
         // Normalize folder path: remove leading slash and ensure trailing slash for exact directory matching
-        const normalizedFolderPath =
-          (folderPath.startsWith('/') ? folderPath.slice(1) : folderPath).replace(/\/$/, '') + '/'
+        const normalizedFolderPath = `${(folderPath.startsWith('/') ? folderPath.slice(1) : folderPath).replace(/\/$/, '')}/`
 
         const matchingFiles: string[] = []
 
@@ -190,16 +189,16 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
 // Test helper - create mock dependencies for testing
 export const VaultServiceTest = (testCache: Map<string, string>) => {
-  const createTestCacheManager = () => {
+  const createTestCacheManager = (): CacheManagerType => {
     const initialCache = new Map(
-      Array.from(testCache.entries()).map(([path, content]) => [
+      Array.from(testCache.entries()).map(([path, content]): [string, VaultFile] => [
         path,
         {
           path,
           content,
           bytes: new TextEncoder().encode(content).length,
           lines: content.split('\n').length,
-        } as any,
+        },
       ]),
     )
     return { cacheRef: Ref.unsafeMake(initialCache), debouncedUpdates: Ref.unsafeMake(new Map()) }
