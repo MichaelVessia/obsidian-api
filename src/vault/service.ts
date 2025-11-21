@@ -33,7 +33,11 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
       // HTTP-friendly getFile with error handling and filename normalization
       getFileContent: Effect.fn('vault.getFileContent', {
-        attributes: { filename: (filename: string) => filename },
+        attributes: {
+          filename: (filename: string) => filename,
+          found: (_filename: string, result: string) => result !== null,
+          contentSize: (_filename: string, result: string) => new TextEncoder().encode(result).length,
+        },
       })(function* (filename: string) {
         // Early return with BadRequest error for invalid input
         if (!filename || filename.trim() === '') {
@@ -55,7 +59,11 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         return vaultFile.content
       }),
 
-      getAllFiles: Effect.fn('vault.getAllFiles')(function* () {
+      getAllFiles: Effect.fn('vault.getAllFiles', {
+        attributes: {
+          totalFiles: (_: undefined, result: Map<string, string>) => result.size,
+        },
+      })(function* () {
         const cache = yield* getCacheWithFallback(cacheRef, 'getAllFiles')
         const stringMap = new Map<string, string>()
         for (const [path, vaultFile] of cache.entries()) {
@@ -65,7 +73,10 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       }),
 
       searchInFiles: Effect.fn('vault.searchInFiles', {
-        attributes: { query: (query: string) => query },
+        attributes: {
+          query: (query: string) => query,
+          resultCount: (_query: string, results: Array<SearchResult>) => results.length,
+        },
       })(function* (query: string) {
         if (!query || query.trim() === '') {
           return []
@@ -85,7 +96,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         return results
       }),
 
-      reload: Effect.fn('vault.reload')(function* () {
+      reload: Effect.fn('vault.reload', {
+        attributes: {
+          filesLoaded: (_: undefined, _result: undefined) => {
+            // This will be updated via side effect during execution
+            return 0
+          },
+        },
+      })(function* () {
         const cacheManager = yield* CacheManager
         const newCache = yield* getCacheWithFallback(cacheManager.cacheRef, 'reload')
         yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
@@ -127,7 +145,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           }
         }),
 
-      getFilePaths: Effect.fn('vault.getFilePaths')(function* (limit: number, offset: number) {
+      getFilePaths: Effect.fn('vault.getFilePaths', {
+        attributes: {
+          limit: (args: [number, number]) => args[0],
+          offset: (args: [number, number]) => args[1],
+          returned: (_: [number, number], result: { files: string[]; total: number }) => result.files.length,
+          total: (_: [number, number], result: { files: string[]; total: number }) => result.total,
+        },
+      })(function* (limit: number, offset: number) {
         const cache = yield* getCacheWithFallback(cacheRef, 'getFilePaths')
         const allPaths = Array.from(cache.keys())
         const total = allPaths.length
@@ -142,7 +167,10 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       }),
 
       searchByFolder: Effect.fn('vault.searchByFolder', {
-        attributes: { folderPath: (folderPath: string) => folderPath },
+        attributes: {
+          folderPath: (folderPath: string) => folderPath,
+          matchCount: (_folderPath: string, result: string[]) => result.length,
+        },
       })(function* (folderPath: string) {
         if (!folderPath || folderPath.trim() === '') {
           return []
