@@ -115,25 +115,15 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
                       ),
                     )
                   } else if (stat.type === 'File' && entry.endsWith('.md')) {
-                    return [
-                      yield* loadFile(fullPath).pipe(
-                        Effect.catchAll((error) =>
-                          Effect.gen(function* () {
-                            yield* Effect.logWarning(`Failed to load file: ${fullPath}`, error)
-                            return [
-                              path.relative(config.vaultPath, fullPath),
-                              {
-                                path: fullPath,
-                                content: '',
-                                frontmatter: {},
-                                bytes: 0,
-                                lines: 0,
-                              },
-                            ] as const
-                          }),
-                        ),
+                    return yield* loadFile(fullPath).pipe(
+                      Effect.map((file) => [file]),
+                      Effect.catchAll((error) =>
+                        Effect.gen(function* () {
+                          yield* Effect.logWarning(`Failed to load file: ${fullPath}`, error)
+                          return [] as Array<readonly [string, VaultFile]>
+                        }),
                       ),
-                    ]
+                    )
                   }
                   return [] as Array<readonly [string, VaultFile]>
                 }),
