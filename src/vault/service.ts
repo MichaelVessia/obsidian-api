@@ -4,7 +4,15 @@ import { Effect, Fiber, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
 import type { VaultFile, VaultMetrics } from './domain.js'
-import { DirectoryReadError, FileReadError, FrontmatterParseError } from './domain.js'
+import {
+  DirectoryReadError,
+  FileReadError,
+  FrontmatterParseError,
+  CacheAccessError,
+  SearchError,
+  MetricsCalculationError,
+  FilesListingError,
+} from './domain.js'
 import { parseFrontmatter } from './frontmatter.functions.js'
 import { searchInContent } from './search.functions.js'
 
@@ -275,7 +283,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
     return {
       getFile: (relativePath: string) =>
         Effect.gen(function* () {
-          const cache = yield* Ref.get(cacheRef)
+          const cache = yield* Ref.get(cacheRef).pipe(
+            Effect.catchAll((error) =>
+              Effect.gen(function* () {
+                yield* Effect.logWarning(`Cache access error in getFile(${relativePath})`, error)
+                return new Map<string, VaultFile>()
+              }),
+            ),
+          )
           return Option.fromNullable(cache.get(relativePath)).pipe(Option.map((vaultFile) => vaultFile.content))
         }),
 
@@ -291,8 +306,15 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         // Normalize filename to always end with .md
         const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
 
-        // Get content from cache
-        const cache = yield* Ref.get(cacheRef)
+        // Get content from cache with error handling
+        const cache = yield* Ref.get(cacheRef).pipe(
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Cache access error in getFileContent(${normalizedFilename})`, error)
+              return new Map<string, VaultFile>()
+            }),
+          ),
+        )
         const vaultFile = cache.get(normalizedFilename)
 
         // Convert undefined to NotFound error for API consistency
@@ -304,7 +326,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       }),
 
       getAllFiles: Effect.fn('vault.getAllFiles')(function* () {
-        const cache = yield* Ref.get(cacheRef)
+        const cache = yield* Ref.get(cacheRef).pipe(
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Cache access error in getAllFiles`, error)
+              return new Map<string, VaultFile>()
+            }),
+          ),
+        )
         const stringMap = new Map<string, string>()
         for (const [path, vaultFile] of cache.entries()) {
           stringMap.set(path, vaultFile.content)
@@ -319,7 +348,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           return []
         }
 
-        const cache = yield* Ref.get(cacheRef)
+        const cache = yield* Ref.get(cacheRef).pipe(
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Cache access error in searchInFiles(${query})`, error)
+              return new Map<string, VaultFile>()
+            }),
+          ),
+        )
         const results: Array<SearchResult> = []
 
         // Optimized sequential search with pre-lowercased query
@@ -334,7 +370,18 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       }),
 
       reload: Effect.fn('vault.reload')(function* () {
-        const newCache = yield* loadAllFiles
+        const newCache = yield* loadAllFiles.pipe(
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Failed to reload cache`, error)
+              // Return current cache on failure
+              const current = yield* Ref.get(cacheRef).pipe(
+                Effect.catchAll(() => Effect.succeed(new Map<string, VaultFile>())),
+              )
+              return current
+            }),
+          ),
+        )
         yield* Ref.set(cacheRef, newCache)
         yield* Effect.logInfo(`Cache manually reloaded with ${newCache.size} files`).pipe(
           Effect.annotateLogs({
@@ -346,7 +393,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
       getMetrics: (): Effect.Effect<VaultMetrics> =>
         Effect.gen(function* () {
-          const files = yield* Ref.get(cacheRef)
+          const files = yield* Ref.get(cacheRef).pipe(
+            Effect.catchAll((error) =>
+              Effect.gen(function* () {
+                yield* Effect.logWarning(`Cache access error in getMetrics`, error)
+                return new Map<string, VaultFile>()
+              }),
+            ),
+          )
 
           let totalBytes = 0
           let totalLines = 0
@@ -376,7 +430,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }),
 
       getFilePaths: Effect.fn('vault.getFilePaths')(function* (limit: number, offset: number) {
-        const cache = yield* Ref.get(cacheRef)
+        const cache = yield* Ref.get(cacheRef).pipe(
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Cache access error in getFilePaths`, error)
+              return new Map<string, VaultFile>()
+            }),
+          ),
+        )
         const allPaths = Array.from(cache.keys())
         const total = allPaths.length
 
@@ -396,7 +457,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           return []
         }
 
-        const cache = yield* Ref.get(cacheRef)
+        const cache = yield* Ref.get(cacheRef).pipe(
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Cache access error in searchByFolder(${folderPath})`, error)
+              return new Map<string, VaultFile>()
+            }),
+          ),
+        )
         const normalizedFolderPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath
 
         const matchingFiles: string[] = []
