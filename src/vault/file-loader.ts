@@ -13,7 +13,14 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
 
     // Load a single file with proper error handling
     const loadFile = Effect.fn('vault.loadFile', {
-      attributes: { filePath: (filePath: string) => filePath },
+      attributes: {
+        filePath: (filePath: string) => filePath,
+        relativePath: (filePath: string) => path.relative(config.vaultPath, filePath),
+        bytes: (_: string, result: readonly [string, VaultFile]) => result[1].bytes,
+        lines: (_: string, result: readonly [string, VaultFile]) => result[1].lines,
+        hasFrontmatter: (_: string, result: readonly [string, VaultFile]) =>
+          result[1].frontmatter ? Object.keys(result[1].frontmatter).length > 0 : false,
+      },
     })(
       (filePath: string): Effect.Effect<readonly [string, VaultFile], FileReadError | FrontmatterParseError> =>
         Effect.gen(function* () {
