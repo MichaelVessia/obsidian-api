@@ -150,7 +150,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
               }),
             ),
           ),
-        { concurrency: 8 },
+        { concurrency: 'unbounded' },
       )
 
       return new Map(fileContents)
@@ -197,11 +197,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                   )
                 }),
               ),
-              Effect.catchAll((error) =>
-                Effect.gen(function* () {
-                  yield* Effect.logWarning(`Failed to update file: ${filePath}`, error)
-                }),
-              ),
+              Effect.catchAll((error) => Effect.logWarning(`Failed to update file: ${filePath}`, error)),
             )
           }
         } else {
@@ -214,13 +210,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           })
           yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(Effect.annotateLogs({ filePath: relativePath }))
         }
-      }).pipe(
-        Effect.catchAll((error) =>
-          Effect.gen(function* () {
-            yield* Effect.logWarning(`File watcher error`, error)
-          }),
-        ),
-      )
+      }).pipe(Effect.catchAll((error) => Effect.logWarning(`File watcher error`, error)))
 
     const scheduleUpdate = (filePath: string) =>
       Effect.gen(function* () {
