@@ -12,15 +12,12 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
     const config = yield* VaultConfig
 
     // Load a single file with proper error handling
-    const loadFile = Effect.fn('vault.loadFile', {
-      attributes: {
-        filePath: (filePath: string) => filePath,
-        relativePath: (filePath: string) => path.relative(config.vaultPath, filePath),
-      },
-    })(
+    const loadFile = Effect.fn('vault.loadFile')(
       (filePath: string): Effect.Effect<readonly [string, VaultFile], FileReadError | FrontmatterParseError> =>
         Effect.gen(function* () {
           const relativePath = path.relative(config.vaultPath, filePath)
+          yield* Effect.annotateCurrentSpan('filePath', filePath)
+          yield* Effect.annotateCurrentSpan('relativePath', relativePath)
 
           // Read file content
           const content = yield* fs.readFileString(filePath).pipe(
@@ -55,6 +52,13 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
             bytes,
             lines,
           }
+
+          yield* Effect.annotateCurrentSpan('bytes', bytes)
+          yield* Effect.annotateCurrentSpan('lines', lines)
+          yield* Effect.annotateCurrentSpan(
+            'hasFrontmatter',
+            parsed.frontmatter ? Object.keys(parsed.frontmatter).length > 0 : false,
+          )
 
           return [relativePath, vaultFile] as const
         }),

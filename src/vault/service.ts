@@ -32,9 +32,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }),
 
       // HTTP-friendly getFile with error handling and filename normalization
-      getFileContent: Effect.fn('vault.getFileContent', {
-        attributes: { filename: (filename: string) => filename },
-      })(function* (filename: string) {
+      getFileContent: Effect.fn('vault.getFileContent')(function* (filename: string) {
         // Early return with BadRequest error for invalid input
         if (!filename || filename.trim() === '') {
           return yield* Effect.fail(new HttpApiError.BadRequest())
@@ -42,6 +40,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
         // Normalize filename to always end with .md
         const normalizedFilename = filename.endsWith('.md') ? filename : `${filename}.md`
+        yield* Effect.annotateCurrentSpan('filename', normalizedFilename)
 
         // Get content from cache with error handling
         const cache = yield* getCacheWithFallback(cacheRef, `getFileContent(${normalizedFilename})`)
@@ -49,14 +48,18 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
         // Convert undefined to NotFound error for API consistency
         if (vaultFile === undefined) {
+          yield* Effect.annotateCurrentSpan('found', false)
           return yield* Effect.fail(new HttpApiError.NotFound())
         }
 
+        yield* Effect.annotateCurrentSpan('found', true)
+        yield* Effect.annotateCurrentSpan('contentSize', new TextEncoder().encode(vaultFile.content).length)
         return vaultFile.content
       }),
 
       getAllFiles: Effect.fn('vault.getAllFiles')(function* () {
         const cache = yield* getCacheWithFallback(cacheRef, 'getAllFiles')
+        yield* Effect.annotateCurrentSpan('totalFiles', cache.size)
         const stringMap = new Map<string, string>()
         for (const [path, vaultFile] of cache.entries()) {
           stringMap.set(path, vaultFile.content)
@@ -64,12 +67,12 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         return stringMap
       }),
 
-      searchInFiles: Effect.fn('vault.searchInFiles', {
-        attributes: { query: (query: string) => query },
-      })(function* (query: string) {
+      searchInFiles: Effect.fn('vault.searchInFiles')(function* (query: string) {
         if (!query || query.trim() === '') {
           return []
         }
+
+        yield* Effect.annotateCurrentSpan('query', query)
 
         const cache = yield* getCacheWithFallback(cacheRef, `searchInFiles(${query})`)
         const results: Array<SearchResult> = []
@@ -82,6 +85,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           }
         }
 
+        yield* Effect.annotateCurrentSpan('resultCount', results.length)
         return results
       }),
 
@@ -128,6 +132,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         }),
 
       getFilePaths: Effect.fn('vault.getFilePaths')(function* (limit: number, offset: number) {
+        yield* Effect.annotateCurrentSpan('limit', limit)
+        yield* Effect.annotateCurrentSpan('offset', offset)
+
         const cache = yield* getCacheWithFallback(cacheRef, 'getFilePaths')
         const allPaths = Array.from(cache.keys())
         const total = allPaths.length
@@ -138,15 +145,18 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           Stream.runCollect,
         )
 
+        const returned = files.length
+        yield* Effect.annotateCurrentSpan('returned', returned)
+        yield* Effect.annotateCurrentSpan('total', total)
         return { files: Array.from(files), total }
       }),
 
-      searchByFolder: Effect.fn('vault.searchByFolder', {
-        attributes: { folderPath: (folderPath: string) => folderPath },
-      })(function* (folderPath: string) {
+      searchByFolder: Effect.fn('vault.searchByFolder')(function* (folderPath: string) {
         if (!folderPath || folderPath.trim() === '') {
           return []
         }
+
+        yield* Effect.annotateCurrentSpan('folderPath', folderPath)
 
         const cache = yield* getCacheWithFallback(cacheRef, `searchByFolder(${folderPath})`)
         const normalizedFolderPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath
@@ -159,6 +169,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           }
         }
 
+        yield* Effect.annotateCurrentSpan('matchCount', matchingFiles.length)
         return matchingFiles
       }),
     }

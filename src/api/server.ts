@@ -10,16 +10,21 @@ import { TracerLayer } from '../tracing/index.js'
 
 export const api = HttpApi.make('Obsidian API').add(vaultGroup)
 
-const getFileHandler = Effect.fn('vault.getFile', { attributes: { filename: (filename: string) => filename } })(
-  function* (filename: string) {
-    const service = yield* VaultService
-    return yield* service.getFileContent(filename)
-  },
-)
+const getFileHandler = Effect.fn('vault.getFile')(function* (filename: string) {
+  const service = yield* VaultService
+  return yield* service.getFileContent(filename)
+})
 
 const listFilesHandler = Effect.fn('vault.listFiles')(function* (limit: number, offset: number) {
+  yield* Effect.annotateCurrentSpan('limit', limit)
+  yield* Effect.annotateCurrentSpan('offset', offset)
+
   const vault = yield* VaultService
   const result = yield* vault.getFilePaths(limit, offset)
+
+  yield* Effect.annotateCurrentSpan('returned', result.files.length)
+  yield* Effect.annotateCurrentSpan('total', result.total)
+
   return {
     files: result.files,
     total: result.total,
@@ -32,6 +37,9 @@ const reloadHandler = Effect.fn('vault.reload')(function* () {
   const vault = yield* VaultService
   yield* vault.reload()
   const files = yield* vault.getAllFiles()
+
+  yield* Effect.annotateCurrentSpan('filesLoaded', files.size)
+
   return {
     message: 'Vault reloaded successfully',
     filesLoaded: files.size,
@@ -43,16 +51,17 @@ const metricsHandler = Effect.fn('vault.metrics')(function* () {
   return yield* service.getMetrics()
 })
 
-const searchHandler = Effect.fn('vault.search', { attributes: { query: (query: string) => query } })(function* (
-  query: string,
-) {
+const searchHandler = Effect.fn('vault.search')(function* (query: string) {
+  yield* Effect.annotateCurrentSpan('query', query)
+
   const service = yield* VaultService
-  return yield* service.searchInFiles(query)
+  const results = yield* service.searchInFiles(query)
+
+  yield* Effect.annotateCurrentSpan('resultCount', results.length)
+  return results
 })
 
-const searchByFolderHandler = Effect.fn('vault.searchByFolder', {
-  attributes: { folderPath: (folderPath: string) => folderPath },
-})(function* (folderPath: string) {
+const searchByFolderHandler = Effect.fn('vault.searchByFolder')(function* (folderPath: string) {
   const service = yield* VaultService
   return yield* service.searchByFolder(folderPath)
 })
