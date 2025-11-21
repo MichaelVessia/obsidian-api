@@ -25,13 +25,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
     const { cacheRef } = cacheManager
 
     return {
+      // Internal use only: returns Option<string> for safe null handling
       getFile: (relativePath: string) =>
         Effect.gen(function* () {
           const cache = yield* getCacheWithFallback(cacheRef, `getFile(${relativePath})`)
           return Option.fromNullable(cache.get(relativePath)).pipe(Option.map((vaultFile) => vaultFile.content))
         }),
 
-      // HTTP-friendly getFile with error handling and filename normalization
+      // HTTP endpoint handler: getFile with error handling, filename normalization, and span annotations
       getFileContent: Effect.fn('vault.getFileContent')(function* (filename: string) {
         // Early return with BadRequest error for invalid input
         if (!filename || filename.trim() === '') {
