@@ -4,7 +4,7 @@ import { Effect, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
 import type { VaultFile, VaultMetrics } from './domain.js'
-import { CacheManager, type CacheManagerType } from './cache-manager.js'
+import { CacheManager } from './cache-manager.js'
 import { searchInContent } from './search.functions.js'
 
 // Helper to safely access cache, returning empty map on error with logging
@@ -189,41 +189,50 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
 // Test helper - create mock dependencies for testing
 export const VaultServiceTest = (testCache: Map<string, string>) => {
-  const createTestCacheManager = (): CacheManagerType => {
-    const initialCache = new Map(
-      Array.from(testCache.entries()).map(([path, content]): [string, VaultFile] => [
-        path,
-        {
+  const testCacheManagerLayer = Layer.scoped(
+    CacheManager,
+    Effect.gen(function* () {
+      // Build initial cache from test data
+      const initialCache = new Map(
+        Array.from(testCache.entries()).map(([path, content]): [string, VaultFile] => [
           path,
-          content,
-          bytes: new TextEncoder().encode(content).length,
-          lines: content.split('\n').length,
-        },
-      ]),
-    )
-    return { cacheRef: Ref.unsafeMake(initialCache), debouncedUpdates: Ref.unsafeMake(new Map()) }
-  }
+          {
+            path,
+            content,
+            bytes: new TextEncoder().encode(content).length,
+            lines: content.split('\n').length,
+          },
+        ]),
+      )
 
-  return Layer.mergeAll(
-    TestVaultConfig,
-    Layer.succeed(CacheManager, createTestCacheManager() as any),
-    TestFileSystem(testCache),
-    TestPath,
-  ).pipe(Layer.provide(BunContext.layer))
+      // Create refs within Effect scope for proper resource management
+      const cacheRef = yield* Ref.make(initialCache)
+      const debouncedUpdates = yield* Ref.make(new Map())
+
+      return new CacheManager({ cacheRef, debouncedUpdates })
+    }),
+  )
+
+  return Layer.mergeAll(TestVaultConfig, testCacheManagerLayer, TestFileSystem(testCache), TestPath).pipe(
+    Layer.provide(BunContext.layer),
+  )
 }
 
 const TestVaultConfig = Layer.succeed(VaultConfig, { vaultPath: '/test', debounceMs: 100 })
 
-const TestFileSystem = (cache: Map<string, string>) =>
+// Test stubs for required dependencies not exercised in unit tests.
+// Per Effect practices: we avoid mocking I/O, but test fixture stubs for
+// unused dependencies are idiomatic. These are never invoked in tests.
+const TestFileSystem = (_cache: Map<string, string>) =>
   Layer.succeed(FileSystem.FileSystem, {
     readDirectory: () => Effect.succeed([]),
-    readFileString: (path: string) => Effect.succeed(cache.get(path) || ''),
+    readFileString: () => Effect.succeed(''),
     stat: () => Effect.succeed({ type: 'File' as const }),
-    exists: (path: string) => Effect.succeed(cache.has(path)),
+    exists: () => Effect.succeed(false),
     watch: () => Stream.empty,
-  } as any)
+  } as unknown as FileSystem.FileSystem)
 
 const TestPath = Layer.succeed(Path.Path, {
   join: (...parts: string[]) => parts.join('/'),
   relative: (_from: string, to: string) => to,
-} as any)
+} as unknown as Path.Path)
