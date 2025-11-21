@@ -3,7 +3,8 @@ import { BunContext } from '@effect/platform-bun'
 import { Effect, Fiber, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
-import type { VaultMetrics } from './domain.js'
+import type { VaultFile, VaultMetrics } from './domain.js'
+import { DirectoryReadError, FileReadError, FrontmatterParseError } from './domain.js'
 import { parseFrontmatter } from './frontmatter.functions.js'
 import { searchInContent } from './search.functions.js'
 
@@ -13,14 +14,72 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
     const path = yield* Path.Path
     const config = yield* VaultConfig
 
+    // Helper function to load a single file with proper error handling
+    const loadFile = (
+      filePath: string,
+    ): Effect.Effect<readonly [string, VaultFile], FileReadError | FrontmatterParseError> =>
+      Effect.gen(function* () {
+        const relativePath = path.relative(config.vaultPath, filePath)
+
+        // Read file content
+        const content = yield* fs.readFileString(filePath).pipe(
+          Effect.mapError(
+            (error) =>
+              new FileReadError({
+                filePath,
+                cause: error,
+              }),
+          ),
+        )
+
+        // Parse frontmatter
+        const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
+          Effect.mapError(
+            (error) =>
+              new FrontmatterParseError({
+                filePath,
+                cause: error,
+              }),
+          ),
+          Effect.catchAll((error) => {
+            // If frontmatter parsing fails, log and continue with empty frontmatter
+            return Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error).pipe(
+              Effect.as({ frontmatter: {}, content }),
+            )
+          }),
+        )
+
+        // Calculate metrics
+        const bytes = new TextEncoder().encode(mainContent).length
+        const lines = mainContent.split('\n').length
+
+        const vaultFile = {
+          path: filePath,
+          content: mainContent,
+          frontmatter,
+          bytes,
+          lines,
+        }
+
+        return [relativePath, vaultFile] as const
+      })
+
     // Helper function to load all files
     const loadAllFiles = Effect.gen(function* () {
       const walkDirectory = Effect.fn('vault.walkDirectory', {
         attributes: { dirPath: (dirPath: string) => dirPath },
       })(
-        (dirPath: string): Effect.Effect<Array<string>> =>
+        (dirPath: string): Effect.Effect<Array<string>, DirectoryReadError> =>
           Effect.gen(function* () {
-            const entries = yield* fs.readDirectory(dirPath)
+            const entries = yield* fs.readDirectory(dirPath).pipe(
+              Effect.mapError(
+                (error) =>
+                  new DirectoryReadError({
+                    dirPath,
+                    cause: error,
+                  }),
+              ),
+            )
             const results = yield* Effect.forEach(
               entries,
               (entry) =>
@@ -31,10 +90,23 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                   }
 
                   const fullPath = path.join(dirPath, entry)
-                  const stat = yield* fs.stat(fullPath)
+                  const stat = yield* fs.stat(fullPath).pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new DirectoryReadError({
+                          dirPath: fullPath,
+                          cause: error,
+                        }),
+                    ),
+                  )
 
                   if (stat.type === 'Directory') {
-                    return yield* walkDirectory(fullPath)
+                    return yield* walkDirectory(fullPath).pipe(
+                      Effect.catchAll((error) => {
+                        // Log warning but continue with empty array
+                        return Effect.logWarning(`Failed to walk subdirectory: ${fullPath}`, error).pipe(Effect.as([]))
+                      }),
+                    )
                   } else if (stat.type === 'File' && entry.endsWith('.md')) {
                     return [fullPath]
                   }
@@ -44,67 +116,36 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             )
 
             return results.flat()
-          }).pipe(
-            Effect.matchEffect({
-              onFailure: (error) =>
-                Effect.logWarning(`Failed to walk directory: ${dirPath}`, error).pipe(Effect.as([])),
-              onSuccess: Effect.succeed,
-            }),
-          ),
+          }),
       )
 
-      const files = yield* walkDirectory(config.vaultPath)
+      const files = yield* walkDirectory(config.vaultPath).pipe(
+        Effect.catchAll((error) => {
+          // If root directory read fails, log and return empty array
+          return Effect.logWarning(`Failed to walk vault directory: ${config.vaultPath}`, error).pipe(Effect.as([]))
+        }),
+      )
 
       const fileContents = yield* Effect.forEach(
         files,
         (filePath) =>
-          Effect.gen(function* () {
-            const relativePath = path.relative(config.vaultPath, filePath)
-            const vaultFile = yield* Effect.gen(function* () {
-              const content = yield* fs
-                .readFileString(filePath)
-                .pipe(
-                  Effect.catchAll((error) =>
-                    Effect.logWarning(`Failed to read file: ${filePath}`, error).pipe(Effect.as('')),
-                  ),
-                )
-              const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
-                Effect.matchEffect({
-                  onFailure: (error) =>
-                    Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error).pipe(
-                      Effect.as({ frontmatter: {}, content }),
-                    ),
-                  onSuccess: Effect.succeed,
-                }),
+          loadFile(filePath).pipe(
+            Effect.catchAll((error) => {
+              // Log the specific error but continue with empty file
+              return Effect.logWarning(`Failed to load file: ${filePath}`, error).pipe(
+                Effect.as([
+                  path.relative(config.vaultPath, filePath),
+                  {
+                    path: filePath,
+                    content: '',
+                    frontmatter: {},
+                    bytes: 0,
+                    lines: 0,
+                  },
+                ] as const),
               )
-
-              const bytes = new TextEncoder().encode(mainContent).length
-              const lines = mainContent.split('\n').length
-
-              return {
-                path: filePath,
-                content: mainContent,
-                frontmatter,
-                bytes,
-                lines,
-              }
-            }).pipe(
-              Effect.matchEffect({
-                onFailure: (error) =>
-                  Effect.logWarning(`Failed to load file: ${filePath}`, error).pipe(
-                    Effect.as({
-                      path: filePath,
-                      content: '',
-                      frontmatter: {},
-                      bytes: 0,
-                      lines: 0,
-                    }),
-                  ),
-                onSuccess: Effect.succeed,
-              }),
-            )
-            return [relativePath, vaultFile] as const
-          }),
+            }),
+          ),
         { concurrency: 8 },
       )
 
@@ -130,60 +171,32 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         const exists = yield* fs.exists(filePath)
 
         if (exists) {
-          const stat = yield* fs.stat(filePath)
-          if (stat.type === 'File' && filePath.endsWith('.md')) {
-            const vaultFile = yield* Effect.gen(function* () {
-              const content = yield* fs
-                .readFileString(filePath)
-                .pipe(
-                  Effect.catchAll((error) =>
-                    Effect.logWarning(`Failed to read file: ${filePath}`, error).pipe(Effect.as('')),
-                  ),
-                )
-              const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
-                Effect.matchEffect({
-                  onFailure: (error) =>
-                    Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error).pipe(
-                      Effect.as({ frontmatter: {}, content }),
-                    ),
-                  onSuccess: Effect.succeed,
+          const stat = yield* fs.stat(filePath).pipe(
+            Effect.catchAll((error) => {
+              // Log and skip if stat fails
+              return Effect.logWarning(`Failed to stat file: ${filePath}`, error).pipe(Effect.as(null))
+            }),
+          )
+
+          if (stat?.type === 'File' && filePath.endsWith('.md')) {
+            yield* loadFile(filePath).pipe(
+              Effect.andThen(([relativePath, vaultFile]) =>
+                Effect.gen(function* () {
+                  yield* Ref.update(cacheRef, (cache) => {
+                    const newCache = new Map(cache)
+                    newCache.set(relativePath, vaultFile)
+                    return newCache
+                  })
+                  yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
+                    Effect.annotateLogs({ filePath: relativePath }),
+                    Effect.ignore,
+                  )
                 }),
-              )
-
-              const bytes = new TextEncoder().encode(mainContent).length
-              const lines = mainContent.split('\n').length
-
-              return {
-                path: filePath,
-                content: mainContent,
-                frontmatter,
-                bytes,
-                lines,
-              }
-            }).pipe(
-              Effect.matchEffect({
-                onFailure: (error) =>
-                  Effect.logWarning(`Failed to update file: ${filePath}`, error).pipe(
-                    Effect.as({
-                      path: filePath,
-                      content: '',
-                      frontmatter: {},
-                      bytes: 0,
-                      lines: 0,
-                    }),
-                  ),
-                onSuccess: Effect.succeed,
+              ),
+              Effect.catchAll((error) => {
+                // Log specific error but don't fail
+                return Effect.logWarning(`Failed to update file: ${filePath}`, error).pipe(Effect.as(void 0))
               }),
-            )
-            const relativePath = path.relative(config.vaultPath, filePath)
-            yield* Ref.update(cacheRef, (cache) => {
-              const newCache = new Map(cache)
-              newCache.set(relativePath, vaultFile)
-              return newCache
-            })
-            yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
-              Effect.annotateLogs({ filePath: relativePath }),
-              Effect.ignore,
             )
           }
         } else {
@@ -200,9 +213,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           )
         }
       }).pipe(
-        Effect.matchEffect({
-          onFailure: (error) => Effect.logWarning(`File watcher error`, error).pipe(Effect.as(void 0)),
-          onSuccess: () => Effect.void,
+        Effect.catchAll((error) => {
+          // Final catch-all for any unexpected errors in file watching
+          return Effect.logWarning(`File watcher error`, error).pipe(Effect.as(void 0))
         }),
       )
 

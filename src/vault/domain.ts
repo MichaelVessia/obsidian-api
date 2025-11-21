@@ -1,4 +1,30 @@
-import { Schema } from 'effect'
+import { Data, Schema } from 'effect'
+
+// Domain-specific error types using TaggedError pattern
+export class DirectoryReadError extends Data.TaggedError('DirectoryReadError')<{
+  readonly dirPath: string
+  readonly cause: unknown
+}> {}
+
+export class FileReadError extends Data.TaggedError('FileReadError')<{
+  readonly filePath: string
+  readonly cause: unknown
+}> {}
+
+export class FrontmatterParseError extends Data.TaggedError('FrontmatterParseError')<{
+  readonly filePath: string
+  readonly cause: unknown
+}> {}
+
+export class FileLoadError extends Data.TaggedError('FileLoadError')<{
+  readonly filePath: string
+  readonly cause: unknown
+}> {}
+
+export class FileWatcherError extends Data.TaggedError('FileWatcherError')<{
+  readonly vaultPath: string
+  readonly cause: unknown
+}> {}
 
 export const Frontmatter = Schema.Record({
   key: Schema.String,
