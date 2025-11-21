@@ -29,7 +29,7 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
           ),
         )
 
-        // Parse frontmatter with fallback to empty on error
+        // Parse frontmatter - propagate any errors
         const parsed = yield* parseFrontmatter(content).pipe(
           Effect.mapError(
             (error) =>
@@ -37,12 +37,6 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
                 filePath,
                 cause: error,
               }),
-          ),
-          Effect.catchAll((error) =>
-            Effect.gen(function* () {
-              yield* Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error)
-              return { frontmatter: {}, content }
-            }),
           ),
         )
 
