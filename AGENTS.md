@@ -153,3 +153,11 @@ it("should work with mocks", () =>
 - Tests require `setupTests.ts` to be loaded
 - Uses Biome for code quality (linting + formatting)
 - Package manager is Bun (not pnpm)
+
+## Local LLM Context
+
+Additional code/docs live under `.context/`:
+- `effect` – main Effect repo
+- `effect-solutions` – best practices and common patterns repo
+
+These references are tracked in git (folder exists) but contents are ignored, allowing agents to access local clones without version control overhead.

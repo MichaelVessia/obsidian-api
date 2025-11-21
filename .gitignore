@@ -15,3 +15,7 @@ scratchpad/*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local LLM context (tracked folder, ignored contents)
+.context/*
+!.context/.gitkeep
