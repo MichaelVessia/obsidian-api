@@ -152,16 +152,12 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         const allPaths = Array.from(cache.keys())
         const total = allPaths.length
 
-        const files = yield* Stream.fromIterable(allPaths).pipe(
-          Stream.drop(offset),
-          Stream.take(limit),
-          Stream.runCollect,
-        )
+        // Use array slice instead of Stream for simple pagination
+        const files = allPaths.slice(offset, offset + limit)
 
-        const returned = files.length
-        yield* Effect.annotateCurrentSpan('returned', returned)
+        yield* Effect.annotateCurrentSpan('returned', files.length)
         yield* Effect.annotateCurrentSpan('total', total)
-        return { files: Array.from(files), total }
+        return { files, total }
       }),
 
       searchByFolder: Effect.fn('vault.searchByFolder')(function* (folderPath: string) {
