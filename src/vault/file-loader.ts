@@ -12,48 +12,50 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
     const config = yield* VaultConfig
 
     // Load a single file with proper error handling
-    const loadFile = (
-      filePath: string,
-    ): Effect.Effect<readonly [string, VaultFile], FileReadError | FrontmatterParseError> =>
-      Effect.gen(function* () {
-        const relativePath = path.relative(config.vaultPath, filePath)
+    const loadFile = Effect.fn('vault.loadFile', {
+      attributes: { filePath: (filePath: string) => filePath },
+    })(
+      (filePath: string): Effect.Effect<readonly [string, VaultFile], FileReadError | FrontmatterParseError> =>
+        Effect.gen(function* () {
+          const relativePath = path.relative(config.vaultPath, filePath)
 
-        // Read file content
-        const content = yield* fs.readFileString(filePath).pipe(
-          Effect.mapError(
-            (error) =>
-              new FileReadError({
-                filePath,
-                cause: error,
-              }),
-          ),
-        )
+          // Read file content
+          const content = yield* fs.readFileString(filePath).pipe(
+            Effect.mapError(
+              (error) =>
+                new FileReadError({
+                  filePath,
+                  cause: error,
+                }),
+            ),
+          )
 
-        // Parse frontmatter - propagate any errors
-        const parsed = yield* parseFrontmatter(content).pipe(
-          Effect.mapError(
-            (error) =>
-              new FrontmatterParseError({
-                filePath,
-                cause: error,
-              }),
-          ),
-        )
+          // Parse frontmatter - propagate any errors
+          const parsed = yield* parseFrontmatter(content).pipe(
+            Effect.mapError(
+              (error) =>
+                new FrontmatterParseError({
+                  filePath,
+                  cause: error,
+                }),
+            ),
+          )
 
-        // Calculate metrics
-        const bytes = new TextEncoder().encode(parsed.content).length
-        const lines = parsed.content.split('\n').length
+          // Calculate metrics
+          const bytes = new TextEncoder().encode(parsed.content).length
+          const lines = parsed.content.split('\n').length
 
-        const vaultFile = {
-          path: filePath,
-          content: parsed.content,
-          frontmatter: parsed.frontmatter,
-          bytes,
-          lines,
-        }
+          const vaultFile = {
+            path: filePath,
+            content: parsed.content,
+            frontmatter: parsed.frontmatter,
+            bytes,
+            lines,
+          }
 
-        return [relativePath, vaultFile] as const
-      })
+          return [relativePath, vaultFile] as const
+        }),
+    )
 
     // Load all files from vault
     const loadAllFiles = Effect.gen(function* () {
