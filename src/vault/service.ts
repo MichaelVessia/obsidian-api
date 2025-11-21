@@ -4,8 +4,8 @@ import { Effect, Fiber, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
 import type { VaultMetrics } from './domain.js'
-import { parseFrontmatter } from './domain.js'
-import { searchInContent } from './functions.js'
+import { parseFrontmatter } from './frontmatter.functions.js'
+import { searchInContent } from './search.functions.js'
 
 export class VaultService extends Effect.Service<VaultService>()('VaultService', {
   scoped: Effect.gen(function* () {
@@ -40,7 +40,7 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                   }
                   return [] as string[]
                 }),
-              { concurrency: 4 },
+              { concurrency: 'unbounded' },
             )
 
             return results.flat()
@@ -383,6 +383,27 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         )
 
         return { files: Array.from(files), total }
+      }),
+
+      searchByFolder: Effect.fn('vault.searchByFolder', {
+        attributes: { folderPath: (folderPath: string) => folderPath },
+      })(function* (folderPath: string) {
+        if (!folderPath || folderPath.trim() === '') {
+          return []
+        }
+
+        const cache = yield* Ref.get(cacheRef)
+        const normalizedFolderPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath
+
+        const matchingFiles: string[] = []
+
+        for (const [filePath] of cache.entries()) {
+          if (filePath.startsWith(normalizedFolderPath)) {
+            matchingFiles.push(filePath)
+          }
+        }
+
+        return matchingFiles
       }),
     }
   }),

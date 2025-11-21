@@ -1,8 +1,8 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'bun:test'
-import { parseFrontmatter } from './domain.js'
+import { parseFrontmatter } from './frontmatter.functions.js'
 
-describe('domain', () => {
+describe('frontmatter.functions', () => {
   describe('parseFrontmatter', () => {
     it('should handle content without frontmatter', () =>
       Effect.runPromise(

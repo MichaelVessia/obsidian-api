@@ -48,13 +48,21 @@ const searchHandler = Effect.fn('vault.search', { attributes: { query: (query: s
   return yield* service.searchInFiles(query)
 })
 
+const searchByFolderHandler = Effect.fn('vault.searchByFolder', {
+  attributes: { folderPath: (folderPath: string) => folderPath },
+})(function* (folderPath: string) {
+  const service = yield* VaultService
+  return yield* service.searchByFolder(folderPath)
+})
+
 const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
   handlers
     .handle('getFile', ({ path: { filename } }) => getFileHandler(filename))
     .handle('listFiles', () => listFilesHandler(50, 0))
     .handle('reload', () => reloadHandler())
     .handle('metrics', () => metricsHandler())
-    .handle('search', ({ path: { query } }) => searchHandler(query)),
+    .handle('search', ({ path: { query } }) => searchHandler(query))
+    .handle('searchByFolder', ({ path: { folderPath } }) => searchByFolderHandler(folderPath)),
 )
 
 export const ObsidianApiLive = HttpApiBuilder.api(api).pipe(

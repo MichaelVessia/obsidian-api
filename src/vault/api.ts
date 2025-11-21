@@ -15,6 +15,7 @@ export type SearchResults = Schema.Schema.Type<typeof SearchResults>
 
 const filenameParam = HttpApiSchema.param('filename', Schema.String)
 const queryParam = HttpApiSchema.param('query', Schema.String)
+const folderPathParam = HttpApiSchema.param('folderPath', Schema.String)
 
 export const PaginatedFilesResponse = Schema.Struct({
   files: Schema.Array(Schema.String),
@@ -67,3 +68,8 @@ export const vaultGroup = HttpApiGroup.make('Vault')
   )
   .add(HttpApiEndpoint.get('metrics', '/vault/metrics').addSuccess(VaultMetrics))
   .add(HttpApiEndpoint.get('search')`/vault/search/simple/${queryParam}`.addSuccess(SearchResults))
+  .add(
+    HttpApiEndpoint.get('searchByFolder')`/vault/search/folder/${folderPathParam}`.addSuccess(
+      Schema.Array(Schema.String),
+    ),
+  )
