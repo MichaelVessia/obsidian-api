@@ -67,9 +67,13 @@ export const vaultGroup = HttpApiGroup.make('Vault')
     ),
   )
   .add(HttpApiEndpoint.get('metrics', '/vault/metrics').addSuccess(VaultMetrics))
-  .add(HttpApiEndpoint.get('search')`/vault/search/simple/${queryParam}`.addSuccess(SearchResults))
   .add(
-    HttpApiEndpoint.get('searchByFolder')`/vault/search/folder/${folderPathParam}`.addSuccess(
-      Schema.Array(Schema.String),
-    ),
+    HttpApiEndpoint.get('search')`/vault/search/simple/${queryParam}`
+      .addSuccess(SearchResults)
+      .addError(HttpApiError.BadRequest),
+  )
+  .add(
+    HttpApiEndpoint.get('searchByFolder')`/vault/search/folder/${folderPathParam}`
+      .addSuccess(Schema.Array(Schema.String))
+      .addError(HttpApiError.BadRequest),
   )

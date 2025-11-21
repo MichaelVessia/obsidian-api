@@ -1,4 +1,4 @@
-import { HttpApi, HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from '@effect/platform'
+import { HttpApi, HttpApiBuilder, HttpApiError, HttpApiSwagger, HttpMiddleware, HttpServer } from '@effect/platform'
 import { BunHttpServer } from '@effect/platform-bun'
 import { Effect, Layer } from 'effect'
 import { VaultConfigLive } from '../config/vault.js'
@@ -61,6 +61,10 @@ const metricsHandler = Effect.fn('vault.metrics')(function* () {
 })
 
 const searchHandler = Effect.fn('vault.search')(function* (query: string) {
+  if (!query || query.trim() === '') {
+    return yield* Effect.fail(new HttpApiError.BadRequest())
+  }
+
   yield* Effect.annotateCurrentSpan('query', query)
 
   const service = yield* VaultService
@@ -71,6 +75,10 @@ const searchHandler = Effect.fn('vault.search')(function* (query: string) {
 })
 
 const searchByFolderHandler = Effect.fn('vault.searchByFolder')(function* (folderPath: string) {
+  if (!folderPath || folderPath.trim() === '') {
+    return yield* Effect.fail(new HttpApiError.BadRequest())
+  }
+
   yield* Effect.annotateCurrentSpan('folderPath', folderPath)
 
   const service = yield* VaultService
