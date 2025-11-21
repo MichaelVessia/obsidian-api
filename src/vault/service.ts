@@ -190,8 +190,29 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 }) {}
 
 // Test helper - create mock dependencies for testing
-export const VaultServiceTest = (cache: Map<string, string>) =>
-  Layer.mergeAll(TestVaultConfig, TestFileSystem(cache), TestPath).pipe(Layer.provide(BunContext.layer))
+export const VaultServiceTest = (testCache: Map<string, string>) => {
+  const createTestCacheManager = () => {
+    const initialCache = new Map(
+      Array.from(testCache.entries()).map(([path, content]) => [
+        path,
+        {
+          path,
+          content,
+          bytes: new TextEncoder().encode(content).length,
+          lines: content.split('\n').length,
+        } as any,
+      ]),
+    )
+    return { cacheRef: Ref.unsafeMake(initialCache), debouncedUpdates: Ref.unsafeMake(new Map()) }
+  }
+
+  return Layer.mergeAll(
+    TestVaultConfig,
+    Layer.succeed(CacheManager, createTestCacheManager() as any),
+    TestFileSystem(testCache),
+    TestPath,
+  ).pipe(Layer.provide(BunContext.layer))
+}
 
 const TestVaultConfig = Layer.succeed(VaultConfig, { vaultPath: '/test', debounceMs: 100 })
 
