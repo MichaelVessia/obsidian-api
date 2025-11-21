@@ -172,7 +172,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         yield* Effect.annotateCurrentSpan('folderPath', folderPath)
 
         const cache = yield* getCacheWithFallback(cacheRef, `searchByFolder(${folderPath})`)
-        const normalizedFolderPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath
+        // Normalize folder path: remove leading slash and ensure trailing slash for exact directory matching
+        const normalizedFolderPath =
+          (folderPath.startsWith('/') ? folderPath.slice(1) : folderPath).replace(/\/$/, '') + '/'
 
         const matchingFiles: string[] = []
 
