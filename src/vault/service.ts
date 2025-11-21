@@ -4,15 +4,7 @@ import { Effect, Fiber, Layer, Option, Ref, Stream } from 'effect'
 import { VaultConfig } from '../config/vault.js'
 import type { SearchResult } from './api.js'
 import type { VaultFile, VaultMetrics } from './domain.js'
-import {
-  DirectoryReadError,
-  FileReadError,
-  FrontmatterParseError,
-  CacheAccessError,
-  SearchError,
-  MetricsCalculationError,
-  FilesListingError,
-} from './domain.js'
+import { DirectoryReadError, FileReadError, FrontmatterParseError } from './domain.js'
 import { parseFrontmatter } from './frontmatter.functions.js'
 import { searchInContent } from './search.functions.js'
 

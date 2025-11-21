@@ -26,24 +26,6 @@ export class FileWatcherError extends Data.TaggedError('FileWatcherError')<{
   readonly cause: unknown
 }> {}
 
-export class CacheAccessError extends Data.TaggedError('CacheAccessError')<{
-  readonly operation: string
-  readonly cause: unknown
-}> {}
-
-export class SearchError extends Data.TaggedError('SearchError')<{
-  readonly query: string
-  readonly cause: unknown
-}> {}
-
-export class MetricsCalculationError extends Data.TaggedError('MetricsCalculationError')<{
-  readonly cause: unknown
-}> {}
-
-export class FilesListingError extends Data.TaggedError('FilesListingError')<{
-  readonly cause: unknown
-}> {}
-
 export const Frontmatter = Schema.Record({
   key: Schema.String,
   value: Schema.Union(Schema.String, Schema.Number, Schema.Boolean, Schema.Array(Schema.String)),
