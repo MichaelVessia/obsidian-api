@@ -11,6 +11,8 @@ import { TracerLayer } from '../tracing/index.js'
 export const api = HttpApi.make('Obsidian API').add(vaultGroup)
 
 const getFileHandler = Effect.fn('vault.getFile')(function* (filename: string) {
+  yield* Effect.annotateCurrentSpan('filename', filename)
+
   const service = yield* VaultService
   return yield* service.getFileContent(filename)
 })
@@ -48,7 +50,14 @@ const reloadHandler = Effect.fn('vault.reload')(function* () {
 
 const metricsHandler = Effect.fn('vault.metrics')(function* () {
   const service = yield* VaultService
-  return yield* service.getMetrics()
+  const metrics = yield* service.getMetrics()
+
+  yield* Effect.annotateCurrentSpan('totalFiles', metrics.totalFiles)
+  yield* Effect.annotateCurrentSpan('totalBytes', metrics.totalBytes)
+  yield* Effect.annotateCurrentSpan('totalLines', metrics.totalLines)
+  yield* Effect.annotateCurrentSpan('averageFileSize', metrics.averageFileSize)
+
+  return metrics
 })
 
 const searchHandler = Effect.fn('vault.search')(function* (query: string) {
@@ -62,8 +71,13 @@ const searchHandler = Effect.fn('vault.search')(function* (query: string) {
 })
 
 const searchByFolderHandler = Effect.fn('vault.searchByFolder')(function* (folderPath: string) {
+  yield* Effect.annotateCurrentSpan('folderPath', folderPath)
+
   const service = yield* VaultService
-  return yield* service.searchByFolder(folderPath)
+  const results = yield* service.searchByFolder(folderPath)
+
+  yield* Effect.annotateCurrentSpan('matchCount', results.length)
+  return results
 })
 
 const vaultHandlers = HttpApiBuilder.group(api, 'Vault', (handlers) =>
