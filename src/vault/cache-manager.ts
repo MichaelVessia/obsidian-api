@@ -44,15 +44,9 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
                   cause: error,
                 }),
             ),
-            Effect.catchAll((error) =>
-              Effect.gen(function* () {
-                yield* Effect.logWarning(`Failed to stat file: ${filePath}`, error)
-                return null
-              }),
-            ),
           )
 
-          if (statResult?.type === 'File' && filePath.endsWith('.md')) {
+          if (statResult.type === 'File' && filePath.endsWith('.md')) {
             yield* fileLoader.loadFile(filePath).pipe(
               Effect.andThen(([relativePath, vaultFile]) =>
                 Effect.gen(function* () {
@@ -64,11 +58,6 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
                   yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
                     Effect.annotateLogs({ filePath: relativePath }),
                   )
-                }),
-              ),
-              Effect.catchAll((error) =>
-                Effect.gen(function* () {
-                  yield* Effect.logWarning(`Failed to update file: ${filePath}`, error)
                 }),
               ),
             )
