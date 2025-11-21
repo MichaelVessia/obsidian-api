@@ -32,8 +32,8 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
           ),
         )
 
-        // Parse frontmatter
-        const { frontmatter, content: mainContent } = yield* parseFrontmatter(content).pipe(
+        // Parse frontmatter with fallback to empty on error
+        const parsed = yield* parseFrontmatter(content).pipe(
           Effect.mapError(
             (error) =>
               new FrontmatterParseError({
@@ -41,22 +41,22 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                 cause: error,
               }),
           ),
-          Effect.catchAll((error) => {
-            // If frontmatter parsing fails, log and continue with empty frontmatter
-            return Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error).pipe(
-              Effect.as({ frontmatter: {}, content }),
-            )
-          }),
+          Effect.catchAll((error) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning(`Failed to parse frontmatter: ${filePath}`, error)
+              return { frontmatter: {}, content }
+            }),
+          ),
         )
 
         // Calculate metrics
-        const bytes = new TextEncoder().encode(mainContent).length
-        const lines = mainContent.split('\n').length
+        const bytes = new TextEncoder().encode(parsed.content).length
+        const lines = parsed.content.split('\n').length
 
         const vaultFile = {
           path: filePath,
-          content: mainContent,
-          frontmatter,
+          content: parsed.content,
+          frontmatter: parsed.frontmatter,
           bytes,
           lines,
         }
@@ -102,10 +102,12 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
                   if (stat.type === 'Directory') {
                     return yield* walkDirectory(fullPath).pipe(
-                      Effect.catchAll((error) => {
-                        // Log warning but continue with empty array
-                        return Effect.logWarning(`Failed to walk subdirectory: ${fullPath}`, error).pipe(Effect.as([]))
-                      }),
+                      Effect.catchAll((error) =>
+                        Effect.gen(function* () {
+                          yield* Effect.logWarning(`Failed to walk subdirectory: ${fullPath}`, error)
+                          return [] as string[]
+                        }),
+                      ),
                     )
                   } else if (stat.type === 'File' && entry.endsWith('.md')) {
                     return [fullPath]
@@ -120,20 +122,22 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
       )
 
       const files = yield* walkDirectory(config.vaultPath).pipe(
-        Effect.catchAll((error) => {
-          // If root directory read fails, log and return empty array
-          return Effect.logWarning(`Failed to walk vault directory: ${config.vaultPath}`, error).pipe(Effect.as([]))
-        }),
+        Effect.catchAll((error) =>
+          Effect.gen(function* () {
+            yield* Effect.logWarning(`Failed to walk vault directory: ${config.vaultPath}`, error)
+            return [] as string[]
+          }),
+        ),
       )
 
       const fileContents = yield* Effect.forEach(
         files,
         (filePath) =>
           loadFile(filePath).pipe(
-            Effect.catchAll((error) => {
-              // Log the specific error but continue with empty file
-              return Effect.logWarning(`Failed to load file: ${filePath}`, error).pipe(
-                Effect.as([
+            Effect.catchAll((error) =>
+              Effect.gen(function* () {
+                yield* Effect.logWarning(`Failed to load file: ${filePath}`, error)
+                return [
                   path.relative(config.vaultPath, filePath),
                   {
                     path: filePath,
@@ -142,9 +146,9 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                     bytes: 0,
                     lines: 0,
                   },
-                ] as const),
-              )
-            }),
+                ] as const
+              }),
+            ),
           ),
         { concurrency: 8 },
       )
@@ -160,7 +164,6 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         vaultPath: config.vaultPath,
         fileCount: initialCache.size,
       }),
-      Effect.ignore,
     )
 
     // Effect-managed debounced file updates
@@ -172,10 +175,12 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
 
         if (exists) {
           const stat = yield* fs.stat(filePath).pipe(
-            Effect.catchAll((error) => {
-              // Log and skip if stat fails
-              return Effect.logWarning(`Failed to stat file: ${filePath}`, error).pipe(Effect.as(null))
-            }),
+            Effect.catchAll((error) =>
+              Effect.gen(function* () {
+                yield* Effect.logWarning(`Failed to stat file: ${filePath}`, error)
+                return null
+              }),
+            ),
           )
 
           if (stat?.type === 'File' && filePath.endsWith('.md')) {
@@ -189,14 +194,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
                   })
                   yield* Effect.logDebug(`File updated: ${relativePath}`).pipe(
                     Effect.annotateLogs({ filePath: relativePath }),
-                    Effect.ignore,
                   )
                 }),
               ),
-              Effect.catchAll((error) => {
-                // Log specific error but don't fail
-                return Effect.logWarning(`Failed to update file: ${filePath}`, error).pipe(Effect.as(void 0))
-              }),
+              Effect.catchAll((error) =>
+                Effect.gen(function* () {
+                  yield* Effect.logWarning(`Failed to update file: ${filePath}`, error)
+                }),
+              ),
             )
           }
         } else {
@@ -207,16 +212,14 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             newCache.delete(relativePath)
             return newCache
           })
-          yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(
-            Effect.annotateLogs({ filePath: relativePath }),
-            Effect.ignore,
-          )
+          yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(Effect.annotateLogs({ filePath: relativePath }))
         }
       }).pipe(
-        Effect.catchAll((error) => {
-          // Final catch-all for any unexpected errors in file watching
-          return Effect.logWarning(`File watcher error`, error).pipe(Effect.as(void 0))
-        }),
+        Effect.catchAll((error) =>
+          Effect.gen(function* () {
+            yield* Effect.logWarning(`File watcher error`, error)
+          }),
+        ),
       )
 
     const scheduleUpdate = (filePath: string) =>
@@ -265,7 +268,6 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
         )
         yield* Effect.logInfo(`File watcher started on ${config.vaultPath}`).pipe(
           Effect.annotateLogs({ vaultPath: config.vaultPath }),
-          Effect.ignore,
         )
         return fiber
       }),
@@ -349,7 +351,6 @@ export class VaultService extends Effect.Service<VaultService>()('VaultService',
             vaultPath: config.vaultPath,
             fileCount: newCache.size,
           }),
-          Effect.ignore,
         )
       }),
 
