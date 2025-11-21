@@ -181,9 +181,10 @@ author: John Doe
 # Content`
           const result = yield* parseFrontmatter(content)
 
+          // js-yaml behavior: empty string stays empty, null/empty values become undefined
           expect(result.frontmatter).toEqual({
             title: '',
-            description: '',
+            description: undefined,
             author: 'John Doe',
           })
         }),

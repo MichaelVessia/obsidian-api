@@ -28,7 +28,7 @@
     "format-fix": "biome format --write . || nix develop --command biome format --write .",
     "test": "bun test",
     "coverage": "bun test --coverage",
-    "prepare": "lefthook install",
+    "prepare": "effect-language-service patch",
     "changeset-version": "changeset version && bun scripts/version.mjs",
     "changeset-publish": "bun run build && TEST_DIST= bun run test && changeset publish"
   },
@@ -37,7 +37,8 @@
     "@effect/platform": "^0.90.6",
     "@effect/platform-bun": "^0.79.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
-    "effect": "^3.17.7"
+    "effect": "^3.17.7",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.24.8",
