@@ -1,16 +1,18 @@
 import { Schema, Effect, type ParseResult } from 'effect'
 import * as YAML from 'js-yaml'
-import { Frontmatter } from './domain.js'
+import { Frontmatter, YamlParseError } from './domain.js'
 
-const parseYamlValue = (valueStr: string): Effect.Effect<string | number | boolean | readonly string[] | undefined> =>
+const parseYamlValue = (
+  valueStr: string,
+): Effect.Effect<string | number | boolean | readonly string[] | undefined, YamlParseError> =>
   Effect.try({
     try: () => YAML.load(valueStr) as string | number | boolean | readonly string[] | undefined,
-    catch: (error) => new Error(`Failed to parse YAML value: ${valueStr}`, { cause: error }),
-  }).pipe(Effect.catchAll(() => Effect.succeed(valueStr as string)))
+    catch: (error) => new YamlParseError({ valueStr, cause: error }),
+  })
 
 export const parseFrontmatter = (
   content: string,
-): Effect.Effect<{ frontmatter: Frontmatter; content: string }, ParseResult.ParseError> => {
+): Effect.Effect<{ frontmatter: Frontmatter; content: string }, YamlParseError | ParseResult.ParseError> => {
   const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/
   const match = content.match(frontmatterRegex)
 

@@ -72,13 +72,7 @@ export class CacheManager extends Effect.Service<CacheManager>()('CacheManager',
           })
           yield* Effect.logDebug(`File deleted: ${relativePath}`).pipe(Effect.annotateLogs({ filePath: relativePath }))
         }
-      }).pipe(
-        Effect.catchAll((error) =>
-          Effect.gen(function* () {
-            yield* Effect.logWarning(`Cache update error`, error)
-          }),
-        ),
-      )
+      }).pipe(Effect.catchAll((error) => Effect.logWarning(`Cache update error`, error)))
 
     // Schedule debounced update for a file
     const scheduleUpdate = (filePath: string) =>

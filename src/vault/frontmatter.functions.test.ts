@@ -104,14 +104,10 @@ author: John Doe
 # Content
 
 Some content here.`
-          const result = yield* parseFrontmatter(content)
+          const result = yield* Effect.either(parseFrontmatter(content))
 
-          // Should still parse what it can
-          expect(result.frontmatter).toEqual({
-            title: '"Unclosed quote',
-            author: 'John Doe',
-          })
-          expect(result.content).toBe('# Content\n\nSome content here.')
+          // Should throw YamlParseError for malformed YAML
+          expect(result._tag).toBe('Left')
         }),
       ))
 
