@@ -43,7 +43,14 @@ export class YamlParseError extends Data.TaggedError('YamlParseError')<{
 
 export const Frontmatter = Schema.Record({
   key: Schema.String,
-  value: Schema.Union(Schema.String, Schema.Number, Schema.Boolean, Schema.Array(Schema.String), Schema.Undefined),
+  value: Schema.Union(
+    Schema.String,
+    Schema.Number,
+    Schema.Boolean,
+    Schema.Array(Schema.String),
+    Schema.Null,
+    Schema.Undefined,
+  ),
 })
 
 export const VaultFile = Schema.Struct({

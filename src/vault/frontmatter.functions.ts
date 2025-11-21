@@ -2,14 +2,6 @@ import { Schema, Effect, type ParseResult } from 'effect'
 import * as YAML from 'js-yaml'
 import { Frontmatter, YamlParseError } from './domain.js'
 
-const parseYamlValue = (
-  valueStr: string,
-): Effect.Effect<string | number | boolean | readonly string[] | undefined, YamlParseError> =>
-  Effect.try({
-    try: () => YAML.load(valueStr) as string | number | boolean | readonly string[] | undefined,
-    catch: (error) => new YamlParseError({ valueStr, cause: error }),
-  })
-
 export const parseFrontmatter = (
   content: string,
 ): Effect.Effect<{ frontmatter: Frontmatter; content: string }, YamlParseError | ParseResult.ParseError> => {
@@ -27,25 +19,17 @@ export const parseFrontmatter = (
   }
 
   return Effect.gen(function* () {
-    const lines = frontmatterStr.split('\n')
-    const frontmatterEntries: Array<[string, string | number | boolean | readonly string[] | undefined]> = []
+    const parsed = yield* Effect.try({
+      try: () => YAML.load(frontmatterStr),
+      catch: (error) => new YamlParseError({ valueStr: frontmatterStr, cause: error }),
+    })
 
-    for (const line of lines) {
-      const trimmedLine = line.trim()
-      if (!trimmedLine || trimmedLine.startsWith('#')) continue
+    // Filter out null values to convert them to undefined implicitly
+    const entries = Object.entries(parsed ?? {})
+      .filter(([, v]) => v !== null)
+      .map(([k, v]) => [k, v === null ? undefined : v] as const)
 
-      const colonIndex = trimmedLine.indexOf(':')
-      if (colonIndex === -1) continue
-
-      const key = trimmedLine.slice(0, colonIndex).trim()
-      const valueStr = trimmedLine.slice(colonIndex + 1).trim()
-
-      const parsedValue = yield* parseYamlValue(valueStr)
-      frontmatterEntries.push([key, parsedValue])
-    }
-
-    const frontmatterRecord = Object.fromEntries(frontmatterEntries)
-    const frontmatter = yield* Schema.decodeUnknown(Frontmatter)(frontmatterRecord)
+    const frontmatter = yield* Schema.decodeUnknown(Frontmatter)(Object.fromEntries(entries))
 
     return {
       frontmatter,
