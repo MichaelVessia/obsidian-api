@@ -66,8 +66,13 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
 
     // Load all files from vault
     const loadAllFiles = Effect.gen(function* () {
-      const walkDirectory = Effect.fn('vault.walkDirectory')(
-        (dirPath: string): Effect.Effect<Array<string>, DirectoryReadError> =>
+      const walkAndLoad = Effect.fn('vault.walkAndLoad')(
+        (
+          dirPath: string,
+        ): Effect.Effect<
+          Array<readonly [string, VaultFile]>,
+          DirectoryReadError | FileReadError | FrontmatterParseError
+        > =>
           Effect.gen(function* () {
             yield* Effect.annotateCurrentSpan('dirPath', dirPath)
 
@@ -86,7 +91,7 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
                 Effect.gen(function* () {
                   // Skip hidden directories (starting with .) before stat call
                   if (entry.startsWith('.')) {
-                    return [] as string[]
+                    return [] as Array<readonly [string, VaultFile]>
                   }
 
                   const fullPath = path.join(dirPath, entry)
@@ -101,18 +106,36 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
                   )
 
                   if (stat.type === 'Directory') {
-                    return yield* walkDirectory(fullPath).pipe(
+                    return yield* walkAndLoad(fullPath).pipe(
                       Effect.catchAll((error) =>
                         Effect.gen(function* () {
                           yield* Effect.logWarning(`Failed to walk subdirectory: ${fullPath}`, error)
-                          return [] as string[]
+                          return [] as Array<readonly [string, VaultFile]>
                         }),
                       ),
                     )
                   } else if (stat.type === 'File' && entry.endsWith('.md')) {
-                    return [fullPath]
+                    return [
+                      yield* loadFile(fullPath).pipe(
+                        Effect.catchAll((error) =>
+                          Effect.gen(function* () {
+                            yield* Effect.logWarning(`Failed to load file: ${fullPath}`, error)
+                            return [
+                              path.relative(config.vaultPath, fullPath),
+                              {
+                                path: fullPath,
+                                content: '',
+                                frontmatter: {},
+                                bytes: 0,
+                                lines: 0,
+                              },
+                            ] as const
+                          }),
+                        ),
+                      ),
+                    ]
                   }
-                  return [] as string[]
+                  return [] as Array<readonly [string, VaultFile]>
                 }),
               { concurrency: 'unbounded' },
             )
@@ -123,36 +146,13 @@ export class FileLoader extends Effect.Service<FileLoader>()('FileLoader', {
           }),
       )
 
-      const files = yield* walkDirectory(config.vaultPath).pipe(
+      const fileContents = yield* walkAndLoad(config.vaultPath).pipe(
         Effect.catchAll((error) =>
           Effect.gen(function* () {
             yield* Effect.logWarning(`Failed to walk vault directory: ${config.vaultPath}`, error)
-            return [] as string[]
+            return [] as Array<readonly [string, VaultFile]>
           }),
         ),
-      )
-
-      const fileContents = yield* Effect.forEach(
-        files,
-        (filePath) =>
-          loadFile(filePath).pipe(
-            Effect.catchAll((error) =>
-              Effect.gen(function* () {
-                yield* Effect.logWarning(`Failed to load file: ${filePath}`, error)
-                return [
-                  path.relative(config.vaultPath, filePath),
-                  {
-                    path: filePath,
-                    content: '',
-                    frontmatter: {},
-                    bytes: 0,
-                    lines: 0,
-                  },
-                ] as const
-              }),
-            ),
-          ),
-        { concurrency: 'unbounded' },
       )
 
       return new Map(fileContents)
